@@ -8,6 +8,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
+from datetime import datetime
+
+from dotenv import load_dotenv
 
 from pocket_stock.cli.formatter import format_stock_quote
 from pocket_stock.data_provider.config import ProviderConfig
@@ -20,6 +23,21 @@ from pocket_stock.data_provider.exceptions import (
 )
 from pocket_stock.data_provider.models import StockQuote
 from pocket_stock.data_provider.provider import StockDataProvider
+from pocket_stock.search.exceptions import (
+    AuthenticationError,
+    ConfigurationError,
+    MissingAPIKeyError,
+    NetworkError,
+    RateLimitError,
+    SearchError,
+    ServiceError,
+    ValidationError,
+)
+from pocket_stock.search.models import StockSearchDimension
+from pocket_stock.search.service import SearchService
+
+# 加载 .env 文件
+load_dotenv()
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -69,6 +87,70 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     return parser.parse_args()
+
+
+async def search_stock_news(stock_name: str) -> None:
+    """异步搜索指定股票的相关新闻。
+
+    Args:
+        stock_name: 股票名称
+    """
+    try:
+        service = SearchService()
+        response = await service.search_stock(stock_name)
+
+        # 打印搜索结果标题
+        print(f"\n{'=' * 80}")
+        print(f"📰 {stock_name} 相关新闻搜索")
+        print(f"{'=' * 80}")
+        print(f"总结果数: {response.total_results} | 搜索维度: {response.dimension_count} | 耗时: {response.total_time:.2f}秒\n")
+
+        # 维度名称映射
+        dimension_names = {
+            StockSearchDimension.LATEST_NEWS: "最新消息",
+            StockSearchDimension.INSTITUTION_ANALYSIS: "机构分析",
+            StockSearchDimension.RISK_ANALYSIS: "风险排查",
+            StockSearchDimension.PERFORMANCE_EXPECTATION: "业绩预期",
+            StockSearchDimension.INDUSTRY_ANALYSIS: "行业分析",
+        }
+
+        # 遍历各维度并打印结果
+        for dimension, search_response in response.dimensions.items():
+            dimension_name = dimension_names.get(dimension, dimension.value)
+            print(f"【{dimension_name}】({search_response.result_count} 条结果)")
+            print(f"{'─' * 80}")
+
+            if search_response.results:
+                for i, result in enumerate(search_response.results[:5], 1):  # 每个维度最多显示5条
+                    print(f"{i}. {result.title}")
+                    print(f"   {result.url}")
+                    if result.content:
+                        preview = result.content[:150] + "..." if len(result.content) > 150 else result.content
+                        print(f"   {preview}")
+                    print()
+            else:
+                print("   暂无相关结果\n")
+            print(f"{'─' * 80}\n")
+
+    except MissingAPIKeyError:
+        print("错误: 搜索服务未配置 API Key", file=sys.stderr)
+        print("  提示: 请在 .env 文件中设置 TAVILY_API_KEY", file=sys.stderr)
+    except AuthenticationError:
+        print("错误: 搜索服务 API 认证失败", file=sys.stderr)
+        print("  提示: 请检查 TAVILY_API_KEY 是否正确", file=sys.stderr)
+    except RateLimitError as e:
+        print(f"错误: 搜索服务达到速率限制", file=sys.stderr)
+        print(f"  限制: {e.limit}", file=sys.stderr)
+    except (ValidationError, ConfigurationError) as e:
+        print(f"错误: 搜索服务配置或参数错误 - {e.message}", file=sys.stderr)
+    except (NetworkError, ServiceError) as e:
+        print(f"错误: 搜索服务请求失败 - {e.message}", file=sys.stderr)
+    except SearchError as e:
+        print(f"错误: 搜索服务异常 - {e.message}", file=sys.stderr)
+    except Exception as e:
+        print(f"错误: 搜索新闻时发生未知错误", file=sys.stderr)
+        print(f"  异常类型: {type(e).__name__}", file=sys.stderr)
+        print(f"  异常信息: {e}", file=sys.stderr)
 
 
 async def fetch_stock_quote(stock_code: str, timeout: float) -> StockQuote:
@@ -158,6 +240,10 @@ async def async_main() -> int:
         quote = await fetch_stock_quote(stock_code, timeout)
         # 格式化输出
         print(format_stock_quote(quote))
+
+        # 搜索股票相关新闻
+        await search_stock_news(quote.name)
+
         return 0
 
     except (InvalidStockCodeException, NetworkErrorException, ProviderServiceErrorException, DataParseException, DataValidationException) as e:
