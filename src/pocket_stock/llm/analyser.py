@@ -89,6 +89,7 @@ class LLMStockAnalyser:
             api_key=self._config.openai_api_key,
             temperature=0.3,
             timeout=30,
+            verbose=True,
         ).with_structured_output(StockAnalysisResult)
 
     def _build_prompt(self, stock_quote: StockQuote, stock_news: StockSearchResponse) -> str:
