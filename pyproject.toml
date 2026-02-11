@@ -28,6 +28,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "tavily-python>=0.3.0",
     "langchain-openai>=0.2.0",
+    "streamlit>=1.54.0",
 ]
 
 [dependency-groups]
