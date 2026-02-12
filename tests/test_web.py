@@ -354,17 +354,17 @@ class TestFetchStockQuote:
             change_percent=5.0,
         )
 
-        with patch("pocket_stock.cli.web.StockDataProvider") as mock_provider_class:
+        with patch("pocket_stock.cli.web.TencentStockDataProvider") as mock_provider_class:
             mock_provider = AsyncMock()
             # 正确设置 async context manager
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
-            mock_provider.get_stock_quote = AsyncMock(return_value=mock_quote)
+            mock_provider.get = AsyncMock(return_value=mock_quote)
 
             result = await fetch_stock_quote("sh600000")
             assert result.stock_code == "sh600000"
             assert result.name == "浦发银行"
-            mock_provider.get_stock_quote.assert_called_once_with("sh600000")
+            mock_provider.get.assert_called_once_with("sh600000")
 
     @pytest.mark.asyncio
     async def test_fetch_quote_with_timeout(self) -> None:
@@ -377,12 +377,12 @@ class TestFetchStockQuote:
             change_percent=5.0,
         )
 
-        with patch("pocket_stock.cli.web.StockDataProvider") as mock_provider_class:
+        with patch("pocket_stock.cli.web.TencentStockDataProvider") as mock_provider_class:
             mock_provider = AsyncMock()
             # 正确设置 async context manager
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
-            mock_provider.get_stock_quote = AsyncMock(return_value=mock_quote)
+            mock_provider.get = AsyncMock(return_value=mock_quote)
 
             result = await fetch_stock_quote("sh600000", timeout=15.0)
             assert result.stock_code == "sh600000"
@@ -392,12 +392,12 @@ class TestFetchStockQuote:
     @pytest.mark.asyncio
     async def test_fetch_quote_network_error(self) -> None:
         """测试网络错误。"""
-        with patch("pocket_stock.cli.web.StockDataProvider") as mock_provider_class:
+        with patch("pocket_stock.cli.web.TencentStockDataProvider") as mock_provider_class:
             mock_provider = AsyncMock()
             # 需要正确设置 async context manager
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
-            mock_provider.get_stock_quote = AsyncMock(
+            mock_provider.get = AsyncMock(
                 side_effect=NetworkErrorException("sh600000", "Connection failed")
             )
 
@@ -407,12 +407,12 @@ class TestFetchStockQuote:
     @pytest.mark.asyncio
     async def test_fetch_quote_service_error(self) -> None:
         """测试服务错误。"""
-        with patch("pocket_stock.cli.web.StockDataProvider") as mock_provider_class:
+        with patch("pocket_stock.cli.web.TencentStockDataProvider") as mock_provider_class:
             mock_provider = AsyncMock()
             # 需要正确设置 async context manager
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
-            mock_provider.get_stock_quote = AsyncMock(
+            mock_provider.get = AsyncMock(
                 side_effect=ProviderServiceErrorException("sh600000", 500, "Server error")
             )
 
@@ -482,7 +482,6 @@ class TestAnalyseStockWithLLM:
         search_response = MagicMock()
         search_response.total_results = 10
 
-        from pocket_stock.llm.models import ChecklistItem
 
         mock_result = StockAnalysisResult(
             stock_name="浦发银行",
@@ -644,7 +643,6 @@ class TestRenderAnalysisResult:
     @patch("pocket_stock.cli.web.st")
     def test_render_analysis_result_basic(self, mock_st) -> None:
         """测试基本分析结果渲染。"""
-        from pocket_stock.llm.models import ChecklistItem
 
         result = StockAnalysisResult(
             stock_name="浦发银行",

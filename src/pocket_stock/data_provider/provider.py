@@ -1,7 +1,7 @@
-"""股票数据提供者。"""
+"""股票数据提供者基类及具体实现。"""
 
+import abc
 import asyncio
-import logging
 from typing import Any
 
 import aiohttp
@@ -12,30 +12,29 @@ from pocket_stock.data_provider.exceptions import (
     NetworkErrorException,
     ProviderServiceErrorException,
 )
-from pocket_stock.data_provider.logger import log_error, log_request, log_response, setup_logger
+from pocket_stock.data_provider.logger import log_error, log_request, log_response
 from pocket_stock.data_provider.models import StockQuote
-from pocket_stock.data_provider.parser import TencentFinanceParser
 
 
-class StockDataProvider:
-    """股票数据提供者。
+class BaseStockDataProvider(abc.ABC):
+    """股票数据提供者基类。
 
-    该类提供从腾讯财经获取股票实时行情的异步接口。
+    定义获取股票数据的通用接口，包括股票代码验证、数据获取、
+    日志记录和异常处理等通用功能。
+
+    子类需要实现抽象方法 `_get` 来具体获取原始数据。
 
     Attributes:
         config: 配置对象
         session: aiohttp 异步 HTTP 客户端会话
-        parser: 数据解析器
+        _owned_session: 是否拥有会话的所有权（用于在退出时关闭会话）
 
     Examples:
-        >>> config = ProviderConfig(timeout=10.0)
-        >>> provider = StockDataProvider(config)
-        >>> quote = await provider.get_stock_quote("sh600000")
-        >>> print(f"股票名称: {quote.name}, 当前价格: {quote.current_price}")
+        >>> class MyProvider(BaseStockDataProvider):
+        ...     async def _get(self, stock_code: str) -> str:
+        ...         # 实现具体的数据获取逻辑
+        ...         return "raw_data"
     """
-
-    # 腾讯财经 API URL
-    _API_URL = "https://qt.gtimg.cn/q={stock_code}"
 
     def __init__(
         self,
@@ -51,15 +50,20 @@ class StockDataProvider:
 
         Examples:
             >>> config = ProviderConfig(timeout=10.0)
-            >>> provider = StockDataProvider(config)
+            >>> provider = MyProvider(config)
         """
         self.config = config
         self.session = session
-        self.parser = TencentFinanceParser()
         self._owned_session = session is None
 
-    async def __aenter__(self) -> "StockDataProvider":
-        """异步上下文管理器入口。"""
+    async def __aenter__(self) -> "BaseStockDataProvider":
+        """异步上下文管理器入口。
+
+        创建 HTTP 会话（如果尚未创建）。
+
+        Returns:
+            自身实例
+        """
         if self._owned_session and self.session is None:
             self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.config.timeout))
         return self
@@ -70,12 +74,41 @@ class StockDataProvider:
         exc_val: BaseException | None,
         exc_tb: Any,
     ) -> None:
-        """异步上下文管理器出口。"""
+        """异步上下文管理器出口。
+
+        关闭拥有的 HTTP 会话。
+
+        Args:
+            exc_type: 异常类型
+            exc_val: 异常值
+            exc_tb: 异常追踪
+        """
         if self._owned_session and self.session:
             await self.session.close()
 
-    async def get_stock_quote(self, stock_code: str) -> StockQuote:
-        """异步获取指定股票的实时行情。
+    @abc.abstractmethod
+    async def _get(self, stock_code: str) -> StockQuote:
+        """获取股票行情数据。
+
+        子类必须实现此方法，从数据提供者获取并解析数据。
+
+        Args:
+            stock_code: 股票代码
+
+        Returns:
+            股票行情数据对象
+
+        Raises:
+            NetworkErrorException: 网络错误
+            ProviderServiceErrorException: 服务错误
+            DataParseException: 数据解析错误
+        """
+        pass
+
+    async def get(self, stock_code: str) -> StockQuote:
+        """获取股票行情数据。
+
+        检查股票代码合法性，调用子类实现的 `_get` 方法获取并返回行情数据。
 
         Args:
             stock_code: 股票代码（如 "sh600000"、"sz000001"）
@@ -89,9 +122,9 @@ class StockDataProvider:
             ProviderServiceErrorException: 当数据提供者返回错误状态码时
 
         Examples:
-            >>> provider = StockDataProvider(ProviderConfig())
+            >>> provider = MyProvider(ProviderConfig())
             >>> async with provider:
-            ...     quote = await provider.get_stock_quote("sh600000")
+            ...     quote = await provider.get("sh600000")
             ...     print(f"股票名称: {quote.name}, 当前价格: {quote.current_price}")
         """
         # 验证股票代码格式
@@ -101,16 +134,10 @@ class StockDataProvider:
         await log_request(stock_code, timeout=self.config.timeout)
 
         try:
-            # 构建 API URL
-            url = self._API_URL.format(stock_code=stock_code)
-
-            # 发起异步 HTTP 请求
+            # 获取并解析数据（由子类实现）
             start_time = asyncio.get_event_loop().time()
-            response_text = await self._fetch_data(url)
+            quote = await self._get(stock_code)
             elapsed_time = asyncio.get_event_loop().time() - start_time
-
-            # 解析数据
-            quote = await self.parser.parse(response_text, stock_code)
 
             # 记录响应日志
             await log_response(stock_code, elapsed_time, status="success")
@@ -127,56 +154,6 @@ class StockDataProvider:
             # 记录错误日志
             await log_error(e, stock_code=stock_code)
             raise
-
-    async def _fetch_data(self, url: str) -> str:
-        """异步获取数据。
-
-        Args:
-            url: 请求 URL
-
-        Returns:
-            响应文本
-
-        Raises:
-            NetworkErrorException: 当网络连接失败或超时时
-            ProviderServiceErrorException: 当 HTTP 状态码不是 200 时
-        """
-        if self.session is None:
-            raise RuntimeError("会话未初始化，请使用 async with 语句或手动设置 session")
-
-        try:
-            async with self.session.get(url) as response:
-                # 检查 HTTP 状态码
-                if response.status != 200:
-                    raise ProviderServiceErrorException(
-                        stock_code=url.split("=")[-1],
-                        status_code=response.status,
-                        reason=f"HTTP 状态码: {response.status}",
-                    )
-
-                # 读取响应文本
-                text = await response.text()
-
-                # 检查响应是否为空
-                if not text or text.strip() == "":
-                    raise NetworkErrorException(
-                        stock_code=url.split("=")[-1],
-                        reason="数据提供者返回空响应",
-                    )
-
-                return text
-
-        except aiohttp.ClientError as e:
-            raise NetworkErrorException(
-                stock_code=url.split("=")[-1],
-                reason=f"网络请求失败: {e}",
-            ) from e
-
-        except asyncio.TimeoutError as e:
-            raise NetworkErrorException(
-                stock_code=url.split("=")[-1],
-                reason=f"请求超时（{self.config.timeout} 秒）",
-            ) from e
 
     async def close(self) -> None:
         """关闭资源。
@@ -197,7 +174,9 @@ class StockDataProvider:
             InvalidStockCodeException: 当股票代码格式不正确时抛出
         """
         if not stock_code or len(stock_code) != 8:
-            raise InvalidStockCodeException(f'无效的股票代码格式: "{stock_code}"，应为8位字符（如 sh600000 或 sz000001）')
+            raise InvalidStockCodeException(
+                f'无效的股票代码格式: "{stock_code}"，应为8位字符（如 sh600000 或 sz000001）'
+            )
 
         prefix = stock_code[:2].lower()
         suffix = stock_code[2:]

@@ -75,11 +75,11 @@ class TestWebIntegration:
         assert error is None
 
         # 2. 获取股票行情
-        with patch("pocket_stock.cli.web.StockDataProvider") as mock_provider_class:
+        with patch("pocket_stock.cli.web.TencentStockDataProvider") as mock_provider_class:
             mock_provider = AsyncMock()
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
-            mock_provider.get_stock_quote = AsyncMock(return_value=mock_quote)
+            mock_provider.get = AsyncMock(return_value=mock_quote)
 
             quote = await fetch_stock_quote("sh600000")
             assert quote.stock_code == "sh600000"
@@ -127,11 +127,11 @@ class TestWebIntegration:
         """测试网络错误情况下的分析流程。"""
         from pocket_stock.data_provider.exceptions import NetworkErrorException
 
-        with patch("pocket_stock.cli.web.StockDataProvider") as mock_provider_class:
+        with patch("pocket_stock.cli.web.TencentStockDataProvider") as mock_provider_class:
             mock_provider = AsyncMock()
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
-            mock_provider.get_stock_quote = AsyncMock(
+            mock_provider.get = AsyncMock(
                 side_effect=NetworkErrorException(stock_code="sh600000", reason="Connection timeout")
             )
 
@@ -143,7 +143,6 @@ class TestWebIntegration:
     @pytest.mark.asyncio
     async def test_analysis_flow_with_search_error(self) -> None:
         """测试搜索服务错误情况下的分析流程。"""
-        from pocket_stock.data_provider.exceptions import NetworkErrorException
         from pocket_stock.search.exceptions import RateLimitError
 
         # Mock 股票行情数据
@@ -155,11 +154,11 @@ class TestWebIntegration:
         mock_quote.change_percent = 5.0
 
         # 1. 获取股票行情成功
-        with patch("pocket_stock.cli.web.StockDataProvider") as mock_provider_class:
+        with patch("pocket_stock.cli.web.TencentStockDataProvider") as mock_provider_class:
             mock_provider = AsyncMock()
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
-            mock_provider.get_stock_quote = AsyncMock(return_value=mock_quote)
+            mock_provider.get = AsyncMock(return_value=mock_quote)
 
             quote = await fetch_stock_quote("sh600000")
             assert quote.stock_code == "sh600000"
@@ -198,11 +197,11 @@ class TestWebIntegration:
         mock_search_response.dimensions = {}
 
         # 1. 获取股票行情成功
-        with patch("pocket_stock.cli.web.StockDataProvider") as mock_provider_class:
+        with patch("pocket_stock.cli.web.TencentStockDataProvider") as mock_provider_class:
             mock_provider = AsyncMock()
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
-            mock_provider.get_stock_quote = AsyncMock(return_value=mock_quote)
+            mock_provider.get = AsyncMock(return_value=mock_quote)
 
             quote = await fetch_stock_quote("sh600000")
 
@@ -261,11 +260,11 @@ class TestWebIntegration:
         mock_analysis_result.target_prices.target_price = 12.0
         mock_analysis_result.checklist = []
 
-        with patch("pocket_stock.cli.web.StockDataProvider") as mock_provider_class:
+        with patch("pocket_stock.cli.web.TencentStockDataProvider") as mock_provider_class:
             mock_provider = AsyncMock()
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
-            mock_provider.get_stock_quote = AsyncMock(side_effect=[mock_quote_1, mock_quote_2])
+            mock_provider.get = AsyncMock(side_effect=[mock_quote_1, mock_quote_2])
 
             with patch("pocket_stock.cli.web.SearchService") as mock_service_class:
                 mock_service = MagicMock()
@@ -342,11 +341,11 @@ class TestWebIntegration:
         mock_analysis_result.target_prices.target_price = 11.5
         mock_analysis_result.checklist = []
 
-        with patch("pocket_stock.cli.web.StockDataProvider") as mock_provider_class:
+        with patch("pocket_stock.cli.web.TencentStockDataProvider") as mock_provider_class:
             mock_provider = AsyncMock()
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
-            mock_provider.get_stock_quote = AsyncMock(return_value=mock_quote)
+            mock_provider.get = AsyncMock(return_value=mock_quote)
 
             quote = await fetch_stock_quote("sh600000")
 

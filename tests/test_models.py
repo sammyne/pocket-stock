@@ -5,7 +5,6 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-from pocket_stock.data_provider.exceptions import DataValidationException
 from pocket_stock.data_provider.models import StockQuote
 
 

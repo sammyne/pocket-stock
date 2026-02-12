@@ -13,8 +13,8 @@ from pocket_stock.data_provider.exceptions import (
     ProviderServiceErrorException,
 )
 from pocket_stock.data_provider.models import StockQuote
-from pocket_stock.data_provider.parser import TencentFinanceParser
-from pocket_stock.data_provider.provider import StockDataProvider
+from pocket_stock.data_provider.provider import BaseStockDataProvider
+from pocket_stock.data_provider.tencent import TencentFinanceParser, TencentStockDataProvider
 
 __all__ = [
     # 配置
@@ -22,7 +22,8 @@ __all__ = [
     # 数据模型
     "StockQuote",
     # 数据提供者
-    "StockDataProvider",
+    "BaseStockDataProvider",
+    "TencentStockDataProvider",
     # 解析器
     "TencentFinanceParser",
     # 异常

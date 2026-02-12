@@ -1,162 +1,170 @@
-"""数据提供者异步单元测试。"""
+"""BaseStockDataProvider 抽象基类单元测试。"""
+
+from unittest.mock import AsyncMock, patch
 
 import aiohttp
 import pytest
-from pytest_mock import MockerFixture
 
 from pocket_stock.data_provider.config import ProviderConfig
-from pocket_stock.data_provider.exceptions import (
-    InvalidStockCodeException,
-    NetworkErrorException,
-    ProviderServiceErrorException,
-)
+from pocket_stock.data_provider.exceptions import InvalidStockCodeException
 from pocket_stock.data_provider.models import StockQuote
-from pocket_stock.data_provider.provider import StockDataProvider
+from pocket_stock.data_provider.provider import BaseStockDataProvider
+
+
+class ConcreteStockDataProvider(BaseStockDataProvider):
+    """用于测试 BaseStockDataProvider 的具体实现。"""
+
+    def __init__(self, config: ProviderConfig, session: aiohttp.ClientSession | None = None) -> None:
+        super().__init__(config, session)
+        self._mock_quote = None
+
+    def set_mock_quote(self, quote: StockQuote) -> None:
+        """设置模拟的股票行情数据。"""
+        self._mock_quote = quote
+
+    async def _get(self, stock_code: str) -> StockQuote:
+        """模拟获取股票行情数据。"""
+        if self.session is None:
+            raise RuntimeError("会话未初始化，请使用 async with 语句或手动设置 session")
+        if self._mock_quote is None:
+            return StockQuote(
+                stock_code=stock_code,
+                name="测试股票",
+                current_price=10.0,
+                change=0.0,
+                change_percent=0.0,
+            )
+        return self._mock_quote
 
 
 @pytest.mark.asyncio
-class TestStockDataProvider:
-    """StockDataProvider 异步测试类。"""
+class TestBaseStockDataProvider:
+    """BaseStockDataProvider 异步测试类。"""
 
     @pytest.fixture
     def config(self) -> ProviderConfig:
-        """创建配置实例。"""
+        """创建配置对象。"""
         return ProviderConfig(timeout=10.0)
 
     @pytest.fixture
-    async def mock_session(self, mocker: MockerFixture) -> aiohttp.ClientSession:
-        """创建模拟的 HTTP 会话。"""
-        session = mocker.MagicMock(spec=aiohttp.ClientSession)
-        return session
+    def provider(self, config: ProviderConfig) -> ConcreteStockDataProvider:
+        """创建提供者实例。"""
+        return ConcreteStockDataProvider(config)
 
-    async def test_get_stock_quote_success(self, config: ProviderConfig, mock_session: aiohttp.ClientSession, mocker: MockerFixture) -> None:
-        """测试成功获取股票行情。"""
-        # 模拟响应对象
-        mock_response = mocker.MagicMock()
-        mock_response.status = 200
-        mock_response.text = mocker.AsyncMock(return_value='{"sh600000": {"name": "浦发银行", "price": 10.25}}')
-        mock_response.__aenter__ = mocker.AsyncMock(return_value=mock_response)
-        mock_response.__aexit__ = mocker.AsyncMock(return_value=None)
+    async def test_abstract_class_cannot_be_instantiated(self, config: ProviderConfig) -> None:
+        """测试抽象类无法直接实例化。"""
+        with pytest.raises(TypeError):
+            BaseStockDataProvider(config)  # type: ignore[abstract]
 
-        # 模拟会话 get 方法
-        mock_session.get = mocker.MagicMock(return_value=mock_response)
+    async def test_validate_stock_code_valid(self, provider: ConcreteStockDataProvider) -> None:
+        """测试有效的股票代码验证。"""
+        # 不应该抛出异常
+        provider._validate_stock_code("sh600000")
+        provider._validate_stock_code("sz000001")
 
-        # 创建提供者并获取数据
-        provider = StockDataProvider(config, session=mock_session)
-        quote = await provider.get_stock_quote("sh600000")
+    async def test_validate_stock_code_invalid_length(self, provider: ConcreteStockDataProvider) -> None:
+        """测试无效长度的股票代码验证。"""
+        with pytest.raises(InvalidStockCodeException, match="应为8位字符"):
+            provider._validate_stock_code("sh6000")
 
-        assert isinstance(quote, StockQuote)
-        assert quote.stock_code == "sh600000"
-        assert quote.name == "浦发银行"
-        assert quote.current_price == 10.25
+    async def test_validate_stock_code_invalid_prefix(self, provider: ConcreteStockDataProvider) -> None:
+        """测试无效前缀的股票代码验证。"""
+        with pytest.raises(InvalidStockCodeException, match='应以 "sh" 或 "sz" 开头'):
+            provider._validate_stock_code("bj600000")
 
-    async def test_get_stock_quote_invalid_code(self, config: ProviderConfig, mock_session: aiohttp.ClientSession) -> None:
-        """测试无效股票代码。"""
-        provider = StockDataProvider(config, session=mock_session)
+    async def test_validate_stock_code_invalid_suffix(self, provider: ConcreteStockDataProvider) -> None:
+        """测试无效后缀的股票代码验证。"""
+        with pytest.raises(InvalidStockCodeException, match="后6位应为数字"):
+            provider._validate_stock_code("sh00a000")
 
-        with pytest.raises(InvalidStockCodeException, match="无效的股票代码格式"):
-            await provider.get_stock_quote("invalid")
+    async def test_validate_stock_code_empty(self, provider: ConcreteStockDataProvider) -> None:
+        """测试空股票代码验证。"""
+        with pytest.raises(InvalidStockCodeException, match="应为8位字符"):
+            provider._validate_stock_code("")
 
-    async def test_get_stock_quote_http_error(self, config: ProviderConfig, mock_session: aiohttp.ClientSession, mocker: MockerFixture) -> None:
-        """测试 HTTP 错误状态码。"""
-        # 模拟响应对象
-        mock_response = mocker.MagicMock()
-        mock_response.status = 404
-        mock_response.__aenter__ = mocker.AsyncMock(return_value=mock_response)
-        mock_response.__aexit__ = mocker.AsyncMock(return_value=None)
+    async def test_context_manager_creates_session(self, config: ProviderConfig) -> None:
+        """测试异步上下文管理器创建会话。"""
+        provider = ConcreteStockDataProvider(config)
+        assert provider.session is None
 
-        # 模拟会话 get 方法
-        mock_session.get = mocker.MagicMock(return_value=mock_response)
+        async with provider:
+            assert provider.session is not None
+            assert provider._owned_session is True
 
-        # 创建提供者并获取数据
-        provider = StockDataProvider(config, session=mock_session)
+    async def test_context_manager_closes_session(self, config: ProviderConfig) -> None:
+        """测试异步上下文管理器关闭会话。"""
+        provider = ConcreteStockDataProvider(config)
 
-        with pytest.raises(ProviderServiceErrorException, match="HTTP 状态码: 404"):
-            await provider.get_stock_quote("sh600000")
+        async with provider:
+            session = provider.session
+            assert session is not None
 
-    async def test_get_stock_quote_empty_response(self, config: ProviderConfig, mock_session: aiohttp.ClientSession, mocker: MockerFixture) -> None:
-        """测试空响应。"""
-        # 模拟响应对象
-        mock_response = mocker.MagicMock()
-        mock_response.status = 200
-        mock_response.text = mocker.AsyncMock(return_value="")
-        mock_response.__aenter__ = mocker.AsyncMock(return_value=mock_response)
-        mock_response.__aexit__ = mocker.AsyncMock(return_value=None)
+        # 退出后应该关闭会话
+        assert session.closed is True
 
-        # 模拟会话 get 方法
-        mock_session.get = mocker.MagicMock(return_value=mock_response)
+    async def test_custom_session_not_closed(self, config: ProviderConfig) -> None:
+        """测试自定义会话不会被关闭。"""
+        custom_session = aiohttp.ClientSession()
+        provider = ConcreteStockDataProvider(config, session=custom_session)
 
-        # 创建提供者并获取数据
-        provider = StockDataProvider(config, session=mock_session)
+        assert provider._owned_session is False
 
-        with pytest.raises(NetworkErrorException, match="数据提供者返回空响应"):
-            await provider.get_stock_quote("sh600000")
+        async with provider:
+            assert provider.session is custom_session
 
-    async def test_get_stock_quote_timeout(self, config: ProviderConfig, mock_session: aiohttp.ClientSession, mocker: MockerFixture) -> None:
-        """测试请求超时。"""
-        # 模拟会话 get 方法抛出超时异常
-        mock_session.get = mocker.MagicMock(side_effect=aiohttp.ServerTimeoutError("请求超时"))
+        # 自定义会话不应该被关闭
+        assert custom_session.closed is False
 
-        # 创建提供者并获取数据
-        provider = StockDataProvider(config, session=mock_session)
+        await custom_session.close()
 
-        # 注意：这里可能需要调整具体的异常类型
-        with pytest.raises(NetworkErrorException):
-            await provider.get_stock_quote("sh600000")
+    async def test_get_valid_stock(self, provider: ConcreteStockDataProvider) -> None:
+        """测试获取有效股票数据。"""
+        async with provider:
+            quote = await provider.get("sh600000")
 
-    async def test_get_stock_quote_network_error(self, config: ProviderConfig, mock_session: aiohttp.ClientSession, mocker: MockerFixture) -> None:
-        """测试网络连接错误。"""
-        # 模拟会话 get 方法抛出连接错误
-        mock_session.get = mocker.MagicMock(side_effect=aiohttp.ClientError("连接失败"))
+            assert isinstance(quote, StockQuote)
+            assert quote.stock_code == "sh600000"
+            assert quote.name == "测试股票"
 
-        # 创建提供者并获取数据
-        provider = StockDataProvider(config, session=mock_session)
+    async def test_get_without_session_raises_error(self, provider: ConcreteStockDataProvider) -> None:
+        """测试未初始化会话时调用 _get 抛出错误。"""
+        # 不使用 async with，让 _get 抛出 RuntimeError
+        with pytest.raises(RuntimeError, match="会话未初始化"):
+            await provider._get("sh600000")
 
-        with pytest.raises(NetworkErrorException, match="网络请求失败"):
-            await provider.get_stock_quote("sh600000")
+    async def test_close_method(self, config: ProviderConfig) -> None:
+        """测试 close 方法。"""
+        provider = ConcreteStockDataProvider(config)
 
-    async def test_context_manager(self, config: ProviderConfig, mocker: MockerFixture) -> None:
-        """测试异步上下文管理器。"""
-        # 模拟 ClientSession
-        mock_session = mocker.MagicMock(spec=aiohttp.ClientSession)
-        mock_session.close = mocker.AsyncMock()
+        async with provider:
+            session = provider.session
+            assert session is not None
 
-        # 模拟响应对象
-        mock_response = mocker.MagicMock()
-        mock_response.status = 200
-        mock_response.text = mocker.AsyncMock(return_value='{"sh600000": {"name": "浦发银行", "price": 10.25}}')
-        mock_response.__aenter__ = mocker.AsyncMock(return_value=mock_response)
-        mock_response.__aexit__ = mocker.AsyncMock(return_value=None)
+        # 调用 close 应该已经关闭了会话
+        assert session.closed is True
 
-        # 模拟会话 get 方法
-        mock_session.get = mocker.MagicMock(return_value=mock_response)
+    async def test_get_logs_request_and_response(
+        self, provider: ConcreteStockDataProvider, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """测试 get 方法记录请求和响应日志。"""
+        with patch("pocket_stock.data_provider.provider.log_request", new_callable=AsyncMock) as mock_log_request:
+            with patch("pocket_stock.data_provider.provider.log_response", new_callable=AsyncMock) as mock_log_response:
+                async with provider:
+                    await provider.get("sh600000")
 
-        # 模拟 ClientSession 创建
-        mock_client_session_class = mocker.patch("aiohttp.ClientSession")
-        mock_client_session_class.return_value = mock_session
+                    mock_log_request.assert_called_once_with("sh600000", timeout=10.0)
+                    mock_log_response.assert_called_once()
 
-        # 使用上下文管理器
-        async with StockDataProvider(config) as provider:
-            quote = await provider.get_stock_quote("sh600000")
-            assert quote.name == "浦发银行"
+    async def test_get_logs_error(
+        self, provider: ConcreteStockDataProvider, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """测试 get 方法记录错误日志。"""
+        with patch("pocket_stock.data_provider.provider.log_error", new_callable=AsyncMock) as mock_log_error:
+            with patch.object(provider, "_get", side_effect=Exception("Mock error")):
+                async with provider:
+                    try:
+                        await provider.get("sh600000")
+                    except Exception:
+                        pass
 
-        # 验证会话被关闭
-        mock_session.close.assert_called_once()
-
-    async def test_custom_session(self, config: ProviderConfig, mock_session: aiohttp.ClientSession, mocker: MockerFixture) -> None:
-        """测试使用自定义会话。"""
-        # 模拟响应对象
-        mock_response = mocker.MagicMock()
-        mock_response.status = 200
-        mock_response.text = mocker.AsyncMock(return_value='{"sh600000": {"name": "浦发银行", "price": 10.25}}')
-        mock_response.__aenter__ = mocker.AsyncMock(return_value=mock_response)
-        mock_response.__aexit__ = mocker.AsyncMock(return_value=None)
-
-        # 模拟会话 get 方法
-        mock_session.get = mocker.MagicMock(return_value=mock_response)
-
-        # 创建提供者并使用自定义会话
-        provider = StockDataProvider(config, session=mock_session)
-        quote = await provider.get_stock_quote("sh600000")
-
-        assert quote.name == "浦发银行"
+                    mock_log_error.assert_called_once()

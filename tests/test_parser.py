@@ -4,7 +4,7 @@ import pytest
 
 from pocket_stock.data_provider.exceptions import DataParseException
 from pocket_stock.data_provider.models import StockQuote
-from pocket_stock.data_provider.parser import TencentFinanceParser
+from pocket_stock.data_provider.tencent.parser import TencentFinanceParser
 
 
 @pytest.mark.asyncio

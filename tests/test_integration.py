@@ -8,7 +8,7 @@ from pocket_stock.data_provider.exceptions import (
     NetworkErrorException,
 )
 from pocket_stock.data_provider.models import StockQuote
-from pocket_stock.data_provider.provider import StockDataProvider
+from pocket_stock.data_provider.tencent.provider import TencentStockDataProvider
 
 
 @pytest.mark.asyncio
@@ -27,8 +27,8 @@ class TestStockDataProviderIntegration:
 
     async def test_get_real_stock_quote(self, config: ProviderConfig) -> None:
         """测试获取真实股票行情。"""
-        async with StockDataProvider(config) as provider:
-            quote = await provider.get_stock_quote("sh600000")
+        async with TencentStockDataProvider(config) as provider:
+            quote = await provider.get("sh600000")
 
             assert isinstance(quote, StockQuote)
             assert quote.stock_code == "sh600000"
@@ -48,9 +48,9 @@ class TestStockDataProviderIntegration:
         """测试获取多只真实股票行情。"""
         stock_codes = ["sh600000", "sz000001"]
 
-        async with StockDataProvider(config) as provider:
+        async with TencentStockDataProvider(config) as provider:
             for code in stock_codes:
-                quote = await provider.get_stock_quote(code)
+                quote = await provider.get(code)
 
                 assert isinstance(quote, StockQuote)
                 assert quote.stock_code == code
@@ -61,16 +61,16 @@ class TestStockDataProviderIntegration:
 
     async def test_invalid_stock_code(self, config: ProviderConfig) -> None:
         """测试无效股票代码。"""
-        async with StockDataProvider(config) as provider:
+        async with TencentStockDataProvider(config) as provider:
             with pytest.raises(InvalidStockCodeException, match="无效的股票代码格式"):
-                await provider.get_stock_quote("invalid_code")
+                await provider.get("invalid_code")
 
     async def test_nonexistent_stock_code(self, config: ProviderConfig) -> None:
         """测试不存在的股票代码。"""
         # 使用有效格式但可能不存在的股票代码
-        async with StockDataProvider(config) as provider:
+        async with TencentStockDataProvider(config) as provider:
             try:
-                quote = await provider.get_stock_quote("sh999999")
+                quote = await provider.get("sh999999")
                 # 如果返回数据，检查是否为空或无效
                 assert quote is not None
             except (NetworkErrorException, Exception):

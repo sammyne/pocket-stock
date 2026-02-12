@@ -21,7 +21,7 @@ from pocket_stock.data_provider.exceptions import (
     ProviderServiceErrorException,
 )
 from pocket_stock.data_provider.models import StockQuote
-from pocket_stock.data_provider.provider import StockDataProvider
+from pocket_stock.data_provider.tencent.provider import TencentStockDataProvider
 from pocket_stock.llm import (
     LLMApiTimeoutError,
     LLMAuthenticationError,
@@ -101,8 +101,8 @@ async def fetch_stock_quote(stock_code: str, timeout: float = 10.0) -> StockQuot
         ProviderServiceErrorException: 服务错误
     """
     config = ProviderConfig(timeout=timeout)
-    async with StockDataProvider(config) as provider:
-        quote = await provider.get_stock_quote(stock_code)
+    async with TencentStockDataProvider(config) as provider:
+        quote = await provider.get(stock_code)
     return quote
 
 

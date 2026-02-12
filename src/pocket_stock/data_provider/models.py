@@ -1,7 +1,6 @@
 """股票行情数据模型。"""
 
 from datetime import datetime
-from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
 

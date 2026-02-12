@@ -1,6 +1,5 @@
 """异常类单元测试。"""
 
-import pytest
 
 from pocket_stock.data_provider.exceptions import (
     DataParseException,
