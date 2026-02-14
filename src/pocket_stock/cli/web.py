@@ -42,6 +42,7 @@ from pocket_stock.search.exceptions import (
 )
 from pocket_stock.search.models import StockSearchDimension, StockSearchResponse
 from pocket_stock.search.service import SearchService
+from pocket_stock.search.config import SearchConfigManager, SearchUserConfig
 
 # 加载 .env 文件
 load_dotenv()
@@ -124,20 +125,41 @@ async def search_stock_news(
     Raises:
         SearchError: 当搜索服务出现异常时抛出。
     """
+    from pocket_stock.search.models import SearchOptions, SearchDepth, SearchTopic
+
     service = SearchService()
 
-    # 构建搜索配置（使用默认 topic）
-    search_config = None
-    if start_date or end_date:
-        from pocket_stock.search.models import SearchOptions
+    # 加载用户搜索配置
+    config_manager = SearchConfigManager()
+    user_config = config_manager.load()
 
-        config_dict = {}
-        if start_date:
-            config_dict["start_date"] = start_date.isoformat()
-        if end_date:
-            config_dict["end_date"] = end_date.isoformat()
+    # 构建搜索配置字典，合并用户配置和时间范围
+    config_dict = {
+        "max_results": user_config.max_results,
+        "search_depth": SearchDepth(user_config.search_depth),
+        "chunks_per_source": user_config.chunks_per_source,
+        "topic": SearchTopic(user_config.topic),
+    }
 
-        search_config = SearchOptions(**config_dict)
+    # 处理 include_answer 配置
+    include_answer_level = user_config.include_answer_level
+    if include_answer_level and include_answer_level != "disabled":
+        config_dict["include_answer"] = SearchDepth(include_answer_level)
+    else:
+        config_dict["include_answer"] = False
+
+    # 只有当 topic 为 general 时才应用 country 配置
+    if user_config.topic == "general":
+        config_dict["country"] = user_config.country
+
+    # 添加时间范围配置
+    if start_date:
+        config_dict["start_date"] = start_date.isoformat()
+    if end_date:
+        config_dict["end_date"] = end_date.isoformat()
+
+    # 创建 SearchOptions 对象
+    search_config = SearchOptions(**config_dict)
 
     response = await service.search_stock(stock_name, search_config)
     return response
@@ -469,10 +491,356 @@ def _validate_date_range(start_date: date, end_date: date) -> tuple[bool, str | 
 def render_settings_page() -> None:
     """渲染设置页面。
 
-    该函数负责显示设置页面的内容。
+    该函数负责显示设置页面的内容，包括搜索配置小节。
     """
     st.title("⚙️ 设置")
-    st.info("设置页面功能正在开发中...")
+
+    # 初始化搜索配置的 session state
+    _init_search_config_state()
+
+    # 获取配置管理器
+    config_manager = SearchConfigManager()
+
+    # 搜索配置小节
+    st.subheader("🔍 搜索配置")
+    st.info("配置搜索行为参数，这些配置将在后续搜索中应用。")
+
+    # 配置状态反馈区域
+    if st.session_state.get("search_config_saved", False):
+        st.success("✅ 配置已保存")
+        st.session_state.search_config_saved = False
+    elif st.session_state.get("search_config_error"):
+        st.error(f"❌ {st.session_state.search_config_error}")
+        st.session_state.search_config_error = None
+
+    st.divider()
+
+    # 按钮区域
+    col1, col2, col3 = st.columns([1, 1, 1])
+
+    with col1:
+        save_button = st.button("💾 保存配置", type="primary", use_container_width=True, key="save_search_config")
+
+    with col2:
+        reset_button = st.button("🔄 重置为默认", use_container_width=True, key="reset_search_config")
+
+    with col3:
+        cancel_button = st.button("❌ 取消修改", use_container_width=True, key="cancel_search_config")
+
+    # 处理按钮点击
+    if save_button:
+        _save_search_config(config_manager)
+
+    if reset_button:
+        _reset_search_config(config_manager)
+
+    if cancel_button:
+        _cancel_search_config(config_manager)
+
+    st.divider()
+
+    # 搜索配置表单区域 - 这里将在后续任务中添加各个配置项
+    _render_search_config_form()
+
+
+def _init_search_config_state() -> None:
+    """初始化搜索配置的 session state。"""
+    config_manager = SearchConfigManager()
+    current_config = config_manager.load()
+
+    # 初始化所有配置项的 session state
+    if "search_max_results" not in st.session_state:
+        st.session_state.search_max_results = current_config.max_results
+    if "search_depth" not in st.session_state:
+        st.session_state.search_depth = current_config.search_depth
+    if "search_chunks_per_source" not in st.session_state:
+        st.session_state.search_chunks_per_source = current_config.chunks_per_source
+    if "search_topic" not in st.session_state:
+        st.session_state.search_topic = current_config.topic
+    if "search_include_answer_level" not in st.session_state:
+        # 将旧版本的 include_answer 和 include_answer_level 转换为新的 answer_level
+        if current_config.include_answer:
+            st.session_state.search_include_answer_level = current_config.include_answer_level or "basic"
+        else:
+            st.session_state.search_include_answer_level = "disabled"
+    if "search_country" not in st.session_state:
+        st.session_state.search_country = current_config.country
+
+    # 初始化状态标记
+    if "search_config_saved" not in st.session_state:
+        st.session_state.search_config_saved = False
+    if "search_config_error" not in st.session_state:
+        st.session_state.search_config_error = None
+
+
+def _get_search_depth_options() -> list[tuple[str, str]]:
+    """获取搜索深度选项列表。
+
+    Returns:
+        选项列表，每个元素为 (显示名称, 实际值) 的元组
+    """
+    return [
+        ("基础", "basic"),
+        ("高级", "advanced"),
+        ("快速", "fast"),
+        ("极速", "ultra-fast"),
+    ]
+
+
+def _get_topic_options() -> list[tuple[str, str]]:
+    """获取搜索主题选项列表。
+
+    Returns:
+        选项列表，每个元素为 (显示名称, 实际值) 的元组
+    """
+    return [
+        ("通用", "general"),
+        ("新闻", "news"),
+        ("金融", "finance"),
+    ]
+
+
+def _get_country_options() -> list[tuple[str, str]]:
+    """获取国家选项列表。
+
+    Returns:
+        选项列表，每个元素为 (显示名称, 实际值) 的元组
+    """
+    return [
+        ("中国", "china"),
+        ("美国", "us"),
+    ]
+
+
+def _get_answer_level_options() -> list[tuple[str, str]]:
+    """获取答案级别选项列表。
+
+    Returns:
+        选项列表，每个元素为 (显示名称, 实际值) 的元组
+    """
+    return [
+        ("屏蔽", "disabled"),
+        ("基础", "basic"),
+        ("详细", "advanced"),
+    ]
+
+
+def _render_search_config_form() -> None:
+    """渲染搜索配置表单。"""
+    # 配置项 1：最大结果数
+    st.markdown("#### 最大结果数")
+    max_results = st.number_input(
+        "设置每次搜索返回的最大结果数量",
+        min_value=0,
+        max_value=20,
+        value=st.session_state.search_max_results,
+        key="max_results_input",
+        help="范围：0-20，数值越大返回的搜索结果越多，但会增加响应时间。0 表示不限制结果数量。",
+    )
+    st.session_state.search_max_results = max_results
+
+    # 验证提示
+    if max_results < 0 or max_results > 20:
+        st.error("⚠️ 最大结果数必须在 0 到 20 之间")
+
+    st.divider()
+
+    # 配置项 2：搜索深度
+    st.markdown("#### 搜索深度")
+    depth_options = _get_search_depth_options()
+    depth_display_options = [opt[0] for opt in depth_options]
+    depth_values = [opt[1] for opt in depth_options]
+
+    search_depth = st.selectbox(
+        "选择搜索深度，控制延迟与结果质量之间的平衡",
+        options=depth_values,
+        format_func=lambda x: next(display for display, value in depth_options if value == x),
+        index=depth_values.index(st.session_state.search_depth),
+        key="search_depth_input",
+        help="""
+**基础**（推荐）：平衡性能与质量，为每个 URL 返回一个 NLP 摘要（1 API Credit）
+**高级**：最高相关性，适合详细、高精度查询，返回多个语义相关的片段（2 API Credit）
+**快速**：优先降低延迟，返回多个语义相关的片段（1 API Credit）
+**极速**：最小化延迟，适合时间敏感场景，为每个 URL 返回一个 NLP 摘要（1 API Credit）
+        """,
+    )
+    st.session_state.search_depth = search_depth
+
+    st.divider()
+
+    # 配置项 3：每个源的内容块数量
+    st.markdown("#### 每个源的内容块数量")
+    if st.session_state.search_depth == "advanced":
+        chunks_per_source = st.number_input(
+            "设置每个源返回的最大内容块数量",
+            min_value=1,
+            max_value=3,
+            value=st.session_state.search_chunks_per_source,
+            key="chunks_per_source_input",
+            help="""
+内容块是从源中直接提取的短内容片段（每块最多 500 个字符）。
+此参数控制每个源返回的最大相关块数，用于控制内容长度。
+内容块会在结果中显示为：<块 1> [...] <块 2> [...] <块 3>
+仅当搜索深度为"高级"时可用。
+范围：1-3
+            """,
+        )
+        st.session_state.search_chunks_per_source = chunks_per_source
+
+        # 验证提示
+        if chunks_per_source < 1 or chunks_per_source > 3:
+            st.error("⚠️ 每个源的内容块数量必须在 1 到 3 之间")
+    else:
+        st.info("💡 此配置项仅在高级搜索深度下可用")
+
+    st.divider()
+
+    # 配置项 4：搜索主题
+    st.markdown("#### 搜索主题")
+    topic_options = _get_topic_options()
+    topic_display_options = [opt[0] for opt in topic_options]
+    topic_values = [opt[1] for opt in topic_options]
+
+    topic = st.selectbox(
+        "选择搜索的主题类别",
+        options=topic_values,
+        format_func=lambda x: next(display for display, value in topic_options if value == x),
+        index=topic_values.index(st.session_state.search_topic),
+        key="topic_input",
+        help="""
+**通用**（推荐）：更广泛的综合搜索，涵盖各类信息源（默认）
+**新闻**：专注于最新新闻，特别适合获取政治、体育和重大时事事件的实时更新
+**金融**：专注于财经资讯和金融信息
+        """,
+    )
+    st.session_state.search_topic = topic
+
+    st.divider()
+
+    # 配置项 5：包含的 AI 答案级别
+    st.markdown("#### 包含的 AI 答案级别")
+    answer_level_options = _get_answer_level_options()
+    answer_level_display_options = [opt[0] for opt in answer_level_options]
+    answer_level_values = [opt[1] for opt in answer_level_options]
+
+    answer_level = st.selectbox(
+        "选择是否在搜索结果中包含 AI 生成的答案",
+        options=answer_level_values,
+        format_func=lambda x: next(display for display, value in answer_level_options if value == x),
+        index=answer_level_values.index(st.session_state.search_include_answer_level),
+        key="include_answer_level_input",
+        help="""
+**屏蔽**（推荐）：不包含 AI 答案，仅返回搜索结果列表，响应速度最快（默认）
+**基础**：包含由 LLM 快速生成的简洁答案，适合快速获取关键信息
+**详细**：包含由 LLM 深入分析生成的详细答案，提供更全面的解释和背景信息
+        """,
+    )
+    st.session_state.search_include_answer_level = answer_level
+
+    st.divider()
+
+    # 配置项 6：优先显示的国家
+    st.markdown("#### 优先显示的国家")
+    if st.session_state.search_topic == "general":
+        country_options = _get_country_options()
+        country_display_options = [opt[0] for opt in country_options]
+        country_values = [opt[1] for opt in country_options]
+
+        country = st.selectbox(
+            "选择优先显示的国家",
+            options=country_values,
+            format_func=lambda x: next(display for display, value in country_options if value == x),
+            index=country_values.index(st.session_state.search_country),
+            key="country_input",
+            help="""
+提升来自指定国家的搜索结果在结果列表中的优先级。
+选择国家后，搜索结果将优先显示该国家的内容。
+仅当搜索主题为"通用"时可用。
+**注意**：这不会过滤掉其他国家的内容，只是调整排序优先级。
+            """,
+        )
+        st.session_state.search_country = country
+    else:
+        st.info("💡 国家配置仅在通用主题下可用")
+
+    st.divider()
+
+
+def _save_search_config(config_manager: SearchConfigManager) -> None:
+    """保存搜索配置。
+
+    Args:
+        config_manager: 配置管理器实例
+    """
+    # 创建配置对象
+    config = SearchUserConfig(
+        max_results=st.session_state.search_max_results,
+        search_depth=st.session_state.search_depth,
+        chunks_per_source=st.session_state.search_chunks_per_source,
+        topic=st.session_state.search_topic,
+        include_answer=st.session_state.search_include_answer_level != "disabled",
+        include_answer_level=st.session_state.search_include_answer_level if st.session_state.search_include_answer_level != "disabled" else None,
+        country=st.session_state.search_country if st.session_state.search_topic == "general" else "china",
+    )
+
+    # 验证并保存配置
+    is_valid, error_msg = config.validate()
+    if not is_valid:
+        st.session_state.search_config_error = error_msg
+        st.rerun()
+        return
+
+    if config_manager.save(config):
+        st.session_state.search_config_saved = True
+        st.session_state.search_config_error = None
+        st.rerun()
+    else:
+        st.session_state.search_config_error = "保存配置失败，请重试"
+        st.rerun()
+
+
+def _reset_search_config(config_manager: SearchConfigManager) -> None:
+    """重置搜索配置为默认值。
+
+    Args:
+        config_manager: 配置管理器实例
+    """
+    if config_manager.reset():
+        # 重新加载默认配置到 session state
+        default_config = SearchUserConfig()
+        st.session_state.search_max_results = default_config.max_results
+        st.session_state.search_depth = default_config.search_depth
+        st.session_state.search_chunks_per_source = default_config.chunks_per_source
+        st.session_state.search_topic = default_config.topic
+        st.session_state.search_include_answer_level = "disabled"  # 默认为屏蔽
+        st.session_state.search_country = default_config.country
+        st.session_state.search_config_saved = True
+        st.session_state.search_config_error = None
+        st.rerun()
+    else:
+        st.session_state.search_config_error = "重置配置失败，请重试"
+        st.rerun()
+
+
+def _cancel_search_config(config_manager: SearchConfigManager) -> None:
+    """取消修改，重新加载已保存的配置。
+
+    Args:
+        config_manager: 配置管理器实例
+    """
+    saved_config = config_manager.load()
+    st.session_state.search_max_results = saved_config.max_results
+    st.session_state.search_depth = saved_config.search_depth
+    st.session_state.search_chunks_per_source = saved_config.chunks_per_source
+    st.session_state.search_topic = saved_config.topic
+    # 兼容旧版本的配置格式
+    if saved_config.include_answer:
+        st.session_state.search_include_answer_level = saved_config.include_answer_level or "basic"
+    else:
+        st.session_state.search_include_answer_level = "disabled"
+    st.session_state.search_country = saved_config.country
+    st.session_state.search_config_error = None
+    st.rerun()
 
 
 def render_home_page() -> None:
