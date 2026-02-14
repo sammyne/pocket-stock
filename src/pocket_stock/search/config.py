@@ -4,12 +4,11 @@
 处理搜索模块的配置加载和验证，使用 pydantic-settings 进行配置管理。
 """
 
-from typing import Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from pocket_stock.search.exceptions import ConfigurationError, MissingAPIKeyError
+from pocket_stock.search.exceptions import ConfigurationError
 
 
 class SearchSettings(BaseSettings):

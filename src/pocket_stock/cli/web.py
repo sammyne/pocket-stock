@@ -9,16 +9,15 @@ import asyncio
 import re
 
 import streamlit as st
-
 from dotenv import load_dotenv
 
 from pocket_stock.data_provider.config import ProviderConfig
 from pocket_stock.data_provider.exceptions import (
-    DataParseException,
-    DataValidationException,
-    InvalidStockCodeException,
-    NetworkErrorException,
-    ProviderServiceErrorException,
+    DataParseError,
+    DataValidationError,
+    InvalidStockCodeError,
+    NetworkError,
+    ProviderServiceError,
 )
 from pocket_stock.data_provider.models import StockQuote
 from pocket_stock.data_provider.tencent.provider import TencentStockDataProvider
@@ -31,14 +30,14 @@ from pocket_stock.llm import (
     StockAnalysisResult,
 )
 from pocket_stock.search.exceptions import (
-    AuthenticationError,
-    ConfigurationError,
-    MissingAPIKeyError,
-    NetworkError,
+    AuthenticationError as SearchAuthenticationError,
+    ConfigurationError as SearchConfigurationError,
+    MissingAPIKeyError as SearchMissingAPIKeyError,
+    NetworkError as SearchNetworkError,
     RateLimitError,
     SearchError,
-    ServiceError,
-    ValidationError,
+    ServiceError as SearchServiceError,
+    ValidationError as SearchValidationError,
 )
 from pocket_stock.search.models import StockSearchDimension, StockSearchResponse
 from pocket_stock.search.service import SearchService
@@ -96,9 +95,9 @@ async def fetch_stock_quote(stock_code: str, timeout: float = 10.0) -> StockQuot
         股票行情数据对象
 
     Raises:
-        InvalidStockCodeException: 股票代码无效
-        NetworkErrorException: 网络错误
-        ProviderServiceErrorException: 服务错误
+        InvalidStockCodeError: 股票代码无效
+        NetworkError: 网络错误
+        ProviderServiceError: 服务错误
     """
     config = ProviderConfig(timeout=timeout)
     async with TencentStockDataProvider(config) as provider:
@@ -287,32 +286,32 @@ def format_error_message(e: Exception, stock_code: str | None = None) -> str:
     """
     code = stock_code if stock_code else "未知"
 
-    if isinstance(e, InvalidStockCodeException):
+    if isinstance(e, InvalidStockCodeError):
         return f"股票代码格式无效\n\n股票代码: {code}\n提示: 格式应为 sh 或 sz 开头，后跟 6 位数字，如 sh600000"
 
-    if isinstance(e, NetworkErrorException):
-        return f"网络连接失败\n\n股票代码: {code}\n原因: {e.reason}"
+    if isinstance(e, NetworkError):
+        return f"网络连接失败\n\n股票代码: {e.stock_code}\n原因: {e.reason}"
 
-    if isinstance(e, ProviderServiceErrorException):
-        return f"数据服务异常\n\n股票代码: {code}\n状态码: {e.status_code}\n原因: {e.reason}"
+    if isinstance(e, ProviderServiceError):
+        return f"数据服务异常\n\n股票代码: {e.stock_code}\n状态码: {e.status_code}\n原因: {e.reason}"
 
-    if isinstance(e, (DataParseException, DataValidationException)):
-        detail = e.message if isinstance(e, DataValidationException) else e.detail
-        return f"数据解析失败\n\n股票代码: {code}\n详情: {detail}"
+    if isinstance(e, (DataParseError, DataValidationError)):
+        detail = e.message if isinstance(e, DataValidationError) else e.detail
+        return f"数据解析失败\n\n股票代码: {e.stock_code if isinstance(e, DataParseError) else code}\n详情: {detail}"
 
-    if isinstance(e, MissingAPIKeyError):
+    if isinstance(e, SearchMissingAPIKeyError):
         return "搜索服务未配置 API Key\n\n提示: 请在 .env 文件中设置 TAVILY_API_KEY"
 
-    if isinstance(e, AuthenticationError):
+    if isinstance(e, SearchAuthenticationError):
         return "搜索服务 API 认证失败\n\n提示: 请检查 TAVILY_API_KEY 是否正确"
 
     if isinstance(e, RateLimitError):
         return f"搜索服务达到速率限制\n\n限制: {e.limit}"
 
-    if isinstance(e, (ValidationError, ConfigurationError)):
+    if isinstance(e, (SearchValidationError, SearchConfigurationError)):
         return f"搜索服务配置或参数错误 - {e.message}"
 
-    if isinstance(e, (NetworkError, ServiceError)):
+    if isinstance(e, (SearchNetworkError, SearchServiceError)):
         return f"搜索服务请求失败 - {e.message}"
 
     if isinstance(e, SearchError):

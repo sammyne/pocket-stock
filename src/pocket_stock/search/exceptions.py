@@ -58,13 +58,13 @@ class ServiceError(SearchError):
     当搜索服务返回错误时抛出。
     """
 
-    def __init__(self, message: str = "搜索服务错误", status_code: int | None = None, *args: object) -> None:
+    def __init__(self, message: str = "搜索服务错误", *args: object, status_code: int | None = None) -> None:
         """初始化服务异常
 
         Args:
             message: 错误消息
-            status_code: HTTP 状态码
             *args: 额外的参数
+            status_code: HTTP 状态码
         """
         self.status_code = status_code
         super().__init__(message, *args)
@@ -87,14 +87,14 @@ class RateLimitError(ServiceError):
     """
 
     def __init__(
-        self, message: str = "达到 API 速率限制", limit: int | None = None, *args: object
+        self, message: str = "达到 API 速率限制", *args: object, limit: int | None = None
     ) -> None:
         """初始化速率限制异常
 
         Args:
             message: 错误消息
-            limit: 速率限制数值
             *args: 额外的参数
+            limit: 速率限制数值
         """
         self.limit = limit
         super().__init__(message, *args)
@@ -107,4 +107,4 @@ class AuthenticationError(ServiceError):
     """
 
     def __init__(self, message: str = "API 认证失败，请检查 API Key", *args: object) -> None:
-        super().__init__(message, status_code=401, *args)
+        super().__init__(message, *args, status_code=401)

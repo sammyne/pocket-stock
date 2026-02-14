@@ -6,10 +6,12 @@
 from typing import Self
 
 from langchain_openai import ChatOpenAI
+from pydantic import ValidationError
 
 from pocket_stock.data_provider.models import StockQuote
 from pocket_stock.llm.config import LLMConfig
 from pocket_stock.llm.exceptions import (
+    ConfigurationError,
     LLMApiTimeoutError,
     LLMAuthenticationError,
     LLMServiceError,
@@ -60,7 +62,12 @@ class LLMStockAnalyser:
         Raises:
             ConfigurationError: 当环境变量配置无效时抛出。
         """
-        config = LLMConfig()
+        try:
+            config = LLMConfig()
+        except ValidationError as e:
+            # 将 pydantic 的 ValidationError 转换为项目自定义的 ConfigurationError
+            error_msg = "; ".join(f"{error['loc'][0]}: {error['msg']}" for error in e.errors())
+            raise ConfigurationError(f"配置验证失败: {error_msg}") from e
         return cls(config)
 
     def _create_llm_instance(self) -> ChatOpenAI:

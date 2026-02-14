@@ -7,24 +7,24 @@
 支持可配置的搜索选项，如搜索深度、结果数量、时间范围等。
 """
 
-from pocket_stock.search.service import SearchService
-from pocket_stock.search.models import SearchResult, SearchConfig, SearchDepth, SearchTimeRange, SearchResponse
 from pocket_stock.search.config import SearchSettings
 from pocket_stock.search.exceptions import (
-    SearchError,
+    AuthenticationError,
     ConfigurationError,
     MissingAPIKeyError,
     NetworkError,
+    RateLimitError,
+    SearchError,
     ServiceError,
     ValidationError,
-    RateLimitError,
-    AuthenticationError,
 )
+from pocket_stock.search.models import SearchDepth, SearchOptions, SearchResponse, SearchResult, SearchTimeRange
+from pocket_stock.search.service import SearchService
 
 __all__ = [
     "SearchService",
     "SearchResult",
-    "SearchConfig",
+    "SearchOptions",
     "SearchDepth",
     "SearchTimeRange",
     "SearchResponse",

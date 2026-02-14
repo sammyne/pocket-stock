@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from pocket_stock.data_provider.exceptions import DataParseException
+from pocket_stock.data_provider.exceptions import DataParseError
 from pocket_stock.data_provider.models import StockQuote
 
 
@@ -87,7 +87,7 @@ class TencentFinanceParser:
             解析后的 StockQuote 对象
 
         Raises:
-            DataParseException: 当数据解析失败或格式不符合预期时
+DataParseError: 当数据解析失败或格式不符合预期时
             ValidationError: 当 pydantic 模型验证失败时
 
         Examples:
@@ -111,7 +111,7 @@ class TencentFinanceParser:
             解析后的 StockQuote 对象
 
         Raises:
-            DataParseException: 当数据解析失败时
+        DataParseError: 当数据解析失败时
         """
         # 移除末尾的分号和换行符
         raw_data = raw_data.rstrip().rstrip(";")
@@ -119,22 +119,22 @@ class TencentFinanceParser:
         # 提取变量名和值部分
         # 格式：v_sh600000="1~浦发银行~600000~..."
         if not raw_data.startswith("v_") or "=" not in raw_data:
-            raise DataParseException(stock_code, "数据格式错误：无法识别腾讯财经格式")
+            raise DataParseError(stock_code, "数据格式错误：无法识别腾讯财经格式")
 
         # 提取引号中的数据部分
         try:
             _, value_part = raw_data.split("=", 1)
             value_part = value_part.strip()
             if not (value_part.startswith('"') and value_part.endswith('"')):
-                raise DataParseException(stock_code, "数据格式错误：缺少引号")
+                raise DataParseError(stock_code, "数据格式错误：缺少引号")
             data_str = value_part[1:-1]  # 移除引号
         except ValueError as e:
-            raise DataParseException(stock_code, f"数据格式错误：{e}") from e
+            raise DataParseError(stock_code, f"数据格式错误：{e}") from e
 
         # 使用 ~ 分割字段
         fields = data_str.split("~")
         if len(fields) < 38:
-            raise DataParseException(stock_code, f"数据格式错误：字段数量不足（{len(fields)}），需要至少38个字段")
+            raise DataParseError(stock_code, f"数据格式错误：字段数量不足（{len(fields)}），需要至少38个字段")
 
         # 腾讯财经字段映射（根据实际返回的数据结构）
         # fields[0]: 未知（固定为1）
@@ -188,7 +188,7 @@ class TencentFinanceParser:
 
             return self._to_stock_quote(cleaned_data, stock_code)
         except (ValueError, TypeError, IndexError) as e:
-            raise DataParseException(stock_code, f"数据解析失败：{e}") from e
+            raise DataParseError(stock_code, f"数据解析失败：{e}") from e
 
     def _to_stock_quote(self, data: dict[str, Any], stock_code: str) -> StockQuote:
         """将清洗后的数据转换为 StockQuote 对象。
@@ -208,6 +208,6 @@ class TencentFinanceParser:
         try:
             return StockQuote(**data)
         except ValidationError as e:
-            # 将 pydantic 的 ValidationError 转换为 DataParseException
+            # 将 pydantic 的 ValidationError 转换为 DataParseError
             error_details = "; ".join(f"{err['loc'][0]}: {err['msg']}" for err in e.errors())
-            raise DataParseException(stock_code, f"数据验证失败: {error_details}") from e
+            raise DataParseError(stock_code, f"数据验证失败: {error_details}") from e

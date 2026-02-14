@@ -167,9 +167,9 @@ StockDataProvider(
 - `StockQuote`: 股票行情数据对象
 
 **异常：**
-- `InvalidStockCodeException`: 当股票代码无效时
-- `NetworkErrorException`: 当网络连接失败或超时时
-- `ProviderServiceErrorException`: 当数据提供者返回错误状态码时
+- `InvalidStockCodeError`: 当股票代码无效时
+- `NetworkError`: 当网络连接失败或超时时
+- `ProviderServiceError`: 当数据提供者返回错误状态码时
 
 ### 数据模型
 
@@ -250,19 +250,19 @@ json_str = quote.model_dump_json()
 - `quote` (StockQuote): 待验证的股票行情对象
 
 **异常：**
-- `DataValidationException`: 当数据验证失败时
+- `DataValidationError`: 当数据验证失败时
 
 ### 异常类
 
 所有异常都继承自 `DataProviderError`。
 
-- `InvalidStockCodeException`: 股票代码无效异常
-- `NetworkErrorException`: 网络错误异常
-- `ProviderServiceErrorException`: 数据提供者服务错误异常
-- `DataParseException`: 数据解析错误异常
-- `DataValidationException`: 数据验证错误异常
+- `InvalidStockCodeError`: 股票代码无效异常
+- `NetworkError`: 网络错误异常
+- `ProviderServiceError`: 数据提供者服务错误异常
+- `DataParseError`: 数据解析错误异常
+- `DataValidationError`: 数据验证错误异常
 
-**注意：** 当使用 `pydantic` 进行数据验证时，无效的数据会引发 `pydantic.ValidationError`，解析器会将其转换为 `DataParseException`。
+**注意：** 当使用 `pydantic` 进行数据验证时，无效的数据会引发 `pydantic.ValidationError`，解析器会将其转换为 `DataParseError`。
 
 ## 错误处理
 

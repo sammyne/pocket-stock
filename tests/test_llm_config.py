@@ -26,8 +26,13 @@ class TestLLMConfig:
         assert config.openai_api_base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
         assert config.openai_api_key == "test-api-key"
 
-    def test_config_from_env_file(self) -> None:
+    def test_config_from_env_file(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """测试从 .env 文件加载配置。"""
+        # 清除所有相关环境变量
+        monkeypatch.delenv("OPENAI_MODEL", raising=False)
+        monkeypatch.delenv("OPENAI_API_BASE_URL", raising=False)
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
         # 创建临时 .env 文件
         with tempfile.TemporaryDirectory() as tmpdir:
             env_file = Path(tmpdir) / ".env"
@@ -42,7 +47,8 @@ OPENAI_API_KEY=sk-test-key
             original_cwd = os.getcwd()
             try:
                 os.chdir(tmpdir)
-                config = LLMConfig()
+                # 显式指定从当前目录的 .env 文件加载
+                config = LLMConfig(_env_file=".env")
                 assert config.openai_model == "gpt-4"
                 assert config.openai_api_base_url == "https://api.openai.com/v1"
                 assert config.openai_api_key == "sk-test-key"
@@ -51,32 +57,35 @@ OPENAI_API_KEY=sk-test-key
 
     def test_config_missing_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """测试缺少模型名称时抛出异常。"""
+        monkeypatch.delenv("OPENAI_MODEL", raising=False)
         monkeypatch.setenv("OPENAI_API_BASE_URL", "https://api.openai.com/v1")
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
-        # 不设置 OPENAI_MODEL
+        # 不设置 OPENAI_MODEL，且禁用 .env 文件加载
 
         with pytest.raises(ValidationError) as exc_info:
-            LLMConfig()
+            LLMConfig(_env_file=None)
         assert "OPENAI_MODEL" in str(exc_info.value)
 
     def test_config_missing_api_base_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """测试缺少 API 基础 URL 时抛出异常。"""
         monkeypatch.setenv("OPENAI_MODEL", "gpt-4")
+        monkeypatch.delenv("OPENAI_API_BASE_URL", raising=False)
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
-        # 不设置 OPENAI_API_BASE_URL
+        # 不设置 OPENAI_API_BASE_URL，且禁用 .env 文件加载
 
         with pytest.raises(ValidationError) as exc_info:
-            LLMConfig()
+            LLMConfig(_env_file=None)
         assert "OPENAI_API_BASE_URL" in str(exc_info.value)
 
     def test_config_missing_api_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """测试缺少 API 密钥时抛出异常。"""
         monkeypatch.setenv("OPENAI_MODEL", "gpt-4")
         monkeypatch.setenv("OPENAI_API_BASE_URL", "https://api.openai.com/v1")
-        # 不设置 OPENAI_API_KEY
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        # 不设置 OPENAI_API_KEY，且禁用 .env 文件加载
 
         with pytest.raises(ValidationError) as exc_info:
-            LLMConfig()
+            LLMConfig(_env_file=None)
         assert "OPENAI_API_KEY" in str(exc_info.value)
 
     def test_config_empty_model(self, monkeypatch: pytest.MonkeyPatch) -> None:

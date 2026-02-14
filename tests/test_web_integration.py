@@ -125,17 +125,17 @@ class TestWebIntegration:
     @pytest.mark.asyncio
     async def test_analysis_flow_with_network_error(self) -> None:
         """测试网络错误情况下的分析流程。"""
-        from pocket_stock.data_provider.exceptions import NetworkErrorException
+        from pocket_stock.data_provider.exceptions import NetworkError
 
         with patch("pocket_stock.cli.web.TencentStockDataProvider") as mock_provider_class:
             mock_provider = AsyncMock()
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
             mock_provider.get = AsyncMock(
-                side_effect=NetworkErrorException(stock_code="sh600000", reason="Connection timeout")
+                side_effect=NetworkError(stock_code="sh600000", reason="Connection timeout")
             )
 
-            with pytest.raises(NetworkErrorException) as exc_info:
+            with pytest.raises(NetworkError) as exc_info:
                 await fetch_stock_quote("sh600000")
 
             assert "Connection timeout" in str(exc_info.value.reason)

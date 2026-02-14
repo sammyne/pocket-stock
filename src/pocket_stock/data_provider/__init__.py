@@ -5,12 +5,12 @@
 
 from pocket_stock.data_provider.config import ProviderConfig
 from pocket_stock.data_provider.exceptions import (
-    DataParseException,
+    DataParseError,
     DataProviderError,
-    DataValidationException,
-    InvalidStockCodeException,
-    NetworkErrorException,
-    ProviderServiceErrorException,
+    DataValidationError,
+    InvalidStockCodeError,
+    NetworkError,
+    ProviderServiceError,
 )
 from pocket_stock.data_provider.models import StockQuote
 from pocket_stock.data_provider.provider import BaseStockDataProvider
@@ -28,9 +28,9 @@ __all__ = [
     "TencentFinanceParser",
     # 异常
     "DataProviderError",
-    "InvalidStockCodeException",
-    "NetworkErrorException",
-    "ProviderServiceErrorException",
-    "DataParseException",
-    "DataValidationException",
+    "InvalidStockCodeError",
+    "NetworkError",
+    "ProviderServiceError",
+    "DataParseError",
+    "DataValidationError",
 ]

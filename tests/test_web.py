@@ -19,11 +19,11 @@ from pocket_stock.cli.web import (
     validate_stock_code,
 )
 from pocket_stock.data_provider.exceptions import (
-    DataParseException,
-    DataValidationException,
-    InvalidStockCodeException,
-    NetworkErrorException,
-    ProviderServiceErrorException,
+    DataParseError,
+    DataValidationError,
+    InvalidStockCodeError,
+    NetworkError,
+    ProviderServiceError,
 )
 from pocket_stock.data_provider.models import StockQuote
 from pocket_stock.llm import (
@@ -36,14 +36,14 @@ from pocket_stock.llm import (
 )
 from pocket_stock.llm.models import ChecklistItem, PositionSuggestion
 from pocket_stock.search.exceptions import (
-    AuthenticationError,
-    ConfigurationError,
-    MissingAPIKeyError,
-    NetworkError,
+    AuthenticationError as SearchAuthenticationError,
+    ConfigurationError as SearchConfigurationError,
+    MissingAPIKeyError as SearchMissingAPIKeyError,
+    NetworkError as SearchNetworkError,
     RateLimitError,
     SearchError,
-    ServiceError,
-    ValidationError,
+    ServiceError as SearchServiceError,
+    ValidationError as SearchValidationError,
 )
 
 
@@ -129,7 +129,7 @@ class TestFormatErrorMessage:
 
     def test_invalid_stock_code_exception(self) -> None:
         """测试股票代码无效异常。"""
-        e = InvalidStockCodeException("股票代码格式无效")
+        e = InvalidStockCodeError("股票代码格式无效")
         msg = format_error_message(e, "sh123")
         assert "股票代码格式无效" in msg
         assert "sh123" in msg
@@ -137,7 +137,7 @@ class TestFormatErrorMessage:
 
     def test_network_error_exception(self) -> None:
         """测试网络错误异常。"""
-        e = NetworkErrorException("sh600000", "Connection timeout")
+        e = NetworkError("sh600000", "Connection timeout")
         msg = format_error_message(e, "sh600000")
         assert "网络连接失败" in msg
         assert "sh600000" in msg
@@ -145,7 +145,7 @@ class TestFormatErrorMessage:
 
     def test_provider_service_error_exception(self) -> None:
         """测试数据服务异常。"""
-        e = ProviderServiceErrorException("sh600000", 500, "Internal Server Error")
+        e = ProviderServiceError("sh600000", 500, "Internal Server Error")
         msg = format_error_message(e, "sh600000")
         assert "数据服务异常" in msg
         assert "500" in msg
@@ -153,28 +153,28 @@ class TestFormatErrorMessage:
 
     def test_data_parse_exception(self) -> None:
         """测试数据解析异常。"""
-        e = DataParseException("sh600000", "Invalid JSON format")
+        e = DataParseError("sh600000", "Invalid JSON format")
         msg = format_error_message(e, "sh600000")
         assert "数据解析失败" in msg
         assert "Invalid JSON format" in msg
 
     def test_data_validation_exception(self) -> None:
         """测试数据验证异常。"""
-        e = DataValidationException("Price cannot be negative")
+        e = DataValidationError("Price cannot be negative")
         msg = format_error_message(e, "sh600000")
         assert "数据解析失败" in msg
         assert "Price cannot be negative" in msg
 
     def test_missing_api_key_error(self) -> None:
         """测试缺少 API Key 异常。"""
-        e = MissingAPIKeyError("TAVILY_API_KEY 环境变量未设置")
+        e = SearchMissingAPIKeyError("TAVILY_API_KEY 环境变量未设置")
         msg = format_error_message(e)
         assert "未配置 API Key" in msg
         assert "TAVILY_API_KEY" in msg
 
     def test_authentication_error(self) -> None:
         """测试认证失败异常。"""
-        e = AuthenticationError(message="Invalid API Key")
+        e = SearchAuthenticationError(message="Invalid API Key")
         msg = format_error_message(e)
         assert "API 认证失败" in msg
         assert "TAVILY_API_KEY" in msg
@@ -188,28 +188,28 @@ class TestFormatErrorMessage:
 
     def test_validation_error_exception(self) -> None:
         """测试搜索服务验证错误。"""
-        e = ValidationError(message="Invalid parameter")
+        e = SearchValidationError(message="Invalid parameter")
         msg = format_error_message(e)
         assert "配置或参数错误" in msg
         assert "Invalid parameter" in msg
 
     def test_configuration_error_exception(self) -> None:
         """测试搜索服务配置错误。"""
-        e = ConfigurationError(message="Missing configuration")
+        e = SearchConfigurationError(message="Missing configuration")
         msg = format_error_message(e)
         assert "配置或参数错误" in msg
         assert "Missing configuration" in msg
 
     def test_network_error_search_exception(self) -> None:
         """测试搜索服务网络错误。"""
-        e = NetworkError(message="Network timeout")
+        e = SearchNetworkError(message="Network timeout")
         msg = format_error_message(e)
         assert "请求失败" in msg
         assert "Network timeout" in msg
 
     def test_service_error_exception(self) -> None:
         """测试搜索服务错误。"""
-        e = ServiceError(message="Service unavailable")
+        e = SearchServiceError(message="Service unavailable")
         msg = format_error_message(e)
         assert "请求失败" in msg
         assert "Service unavailable" in msg
@@ -398,10 +398,10 @@ class TestFetchStockQuote:
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
             mock_provider.get = AsyncMock(
-                side_effect=NetworkErrorException("sh600000", "Connection failed")
+                side_effect=NetworkError("sh600000", "Connection failed")
             )
 
-            with pytest.raises(NetworkErrorException):
+            with pytest.raises(NetworkError):
                 await fetch_stock_quote("sh600000")
 
     @pytest.mark.asyncio
@@ -413,10 +413,10 @@ class TestFetchStockQuote:
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
             mock_provider.get = AsyncMock(
-                side_effect=ProviderServiceErrorException("sh600000", 500, "Server error")
+                side_effect=ProviderServiceError("sh600000", 500, "Server error")
             )
 
-            with pytest.raises(ProviderServiceErrorException):
+            with pytest.raises(ProviderServiceError):
                 await fetch_stock_quote("sh600000")
 
 
@@ -446,10 +446,10 @@ class TestSearchStockNews:
         """测试搜索网络错误。"""
         with patch("pocket_stock.cli.web.SearchService") as mock_service_class:
             mock_service = MagicMock()
-            mock_service.search_stock = AsyncMock(side_effect=NetworkError(message="Network error"))
+            mock_service.search_stock = AsyncMock(side_effect=SearchNetworkError(message="Network error"))
             mock_service_class.return_value = mock_service
 
-            with pytest.raises(NetworkError):
+            with pytest.raises(SearchNetworkError):
                 await search_stock_news("浦发银行")
 
     @pytest.mark.asyncio

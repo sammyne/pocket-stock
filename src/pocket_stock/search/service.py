@@ -6,13 +6,12 @@
 
 import asyncio
 import logging
-from typing import Optional
 
 from pocket_stock.search.client import AsyncTavilySearchClient
 from pocket_stock.search.config import SearchSettings
-from pocket_stock.search.exceptions import ConfigurationError, MissingAPIKeyError, ValidationError
+from pocket_stock.search.exceptions import MissingAPIKeyError, ValidationError
 from pocket_stock.search.models import (
-    SearchConfig,
+    SearchOptions,
     SearchResponse,
     StockSearchDimension,
     StockSearchResponse,
@@ -29,7 +28,7 @@ class SearchService:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
     ) -> None:
         """初始化搜索服务
 
@@ -43,7 +42,7 @@ class SearchService:
             else:
                 self._settings = SearchSettings()
         except ValueError as e:
-            raise MissingAPIKeyError(str(e))
+            raise MissingAPIKeyError(str(e)) from e
 
         # 初始化客户端
         self._client: AsyncTavilySearchClient = AsyncTavilySearchClient(self._settings)
@@ -53,7 +52,7 @@ class SearchService:
     async def search(
         self,
         query: str,
-        config: Optional[SearchConfig] = None,
+        config: SearchOptions | None = None,
     ) -> SearchResponse:
         """执行搜索
 
@@ -82,7 +81,7 @@ class SearchService:
     async def search_multiple(
         self,
         queries: list[str],
-        config: Optional[SearchConfig] = None,
+        config: SearchOptions | None = None,
     ) -> list[SearchResponse]:
         """并发执行多个搜索查询
 
@@ -118,7 +117,7 @@ class SearchService:
     async def search_stock(
         self,
         stock_name: str,
-        config: Optional[SearchConfig] = None,
+        config: SearchOptions | None = None,
     ) -> StockSearchResponse:
         """从多个维度搜索指定股票的相关新闻
 

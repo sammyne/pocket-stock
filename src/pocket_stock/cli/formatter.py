@@ -77,7 +77,7 @@ def _format_change(change: float | None, current_price: float) -> str:
         格式化后的字符串，带颜色标识
     """
     if change is None or change == 0:
-        return f"0.00 元"
+        return "0.00 元"
     sign = "+" if change > 0 else ""
     return f"{sign}{change:.2f} 元"
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from pocket_stock.data_provider.exceptions import DataParseException
+from pocket_stock.data_provider.exceptions import DataParseError
 from pocket_stock.data_provider.models import StockQuote
 from pocket_stock.data_provider.tencent.parser import TencentFinanceParser
 
@@ -55,14 +55,14 @@ class TestTencentFinanceParser:
         """测试解析无效格式。"""
         raw_data = "这不是有效的格式"
 
-        with pytest.raises(DataParseException, match="数据格式错误"):
+        with pytest.raises(DataParseError, match="数据格式错误"):
             await parser.parse(raw_data, "sh600000")
 
     async def test_parse_empty_data(self, parser: TencentFinanceParser) -> None:
         """测试解析空数据。"""
         raw_data = ""
 
-        with pytest.raises(DataParseException, match="数据格式错误"):
+        with pytest.raises(DataParseError, match="数据格式错误"):
             await parser.parse(raw_data, "sh600000")
 
     async def test_parse_with_negative_change(self, parser: TencentFinanceParser) -> None:
@@ -88,7 +88,7 @@ class TestTencentFinanceParser:
         """测试解析无效的价格（负值）。"""
         raw_data = 'v_sh600000="1~浦发银行~600000~-10.25~10.00~10.10~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~-20.25~-202.50~0.00~0.00~~0~0~~0.00~0.00~~0.00~0.00~~0.00~0.00~~0.00~0.00~~0.00~0.00~~0.00~0.00~~0.00~0.00~~0.00~0.00~~0.00~0.00~0.00~~0.00~0.00~~0.00~0.00~0.00~~0.00~~"'
 
-        with pytest.raises(DataParseException):
+        with pytest.raises(DataParseError):
             await parser.parse(raw_data, "sh600000")
 
     async def test_case_insensitive_stock_code(self, parser: TencentFinanceParser) -> None:

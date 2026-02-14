@@ -6,7 +6,7 @@ import aiohttp
 import pytest
 
 from pocket_stock.data_provider.config import ProviderConfig
-from pocket_stock.data_provider.exceptions import InvalidStockCodeException
+from pocket_stock.data_provider.exceptions import InvalidStockCodeError
 from pocket_stock.data_provider.models import StockQuote
 from pocket_stock.data_provider.provider import BaseStockDataProvider
 
@@ -64,22 +64,22 @@ class TestBaseStockDataProvider:
 
     async def test_validate_stock_code_invalid_length(self, provider: ConcreteStockDataProvider) -> None:
         """测试无效长度的股票代码验证。"""
-        with pytest.raises(InvalidStockCodeException, match="应为8位字符"):
+        with pytest.raises(InvalidStockCodeError, match="应为8位字符"):
             provider._validate_stock_code("sh6000")
 
     async def test_validate_stock_code_invalid_prefix(self, provider: ConcreteStockDataProvider) -> None:
         """测试无效前缀的股票代码验证。"""
-        with pytest.raises(InvalidStockCodeException, match='应以 "sh" 或 "sz" 开头'):
+        with pytest.raises(InvalidStockCodeError, match='应以 "sh" 或 "sz" 开头'):
             provider._validate_stock_code("bj600000")
 
     async def test_validate_stock_code_invalid_suffix(self, provider: ConcreteStockDataProvider) -> None:
         """测试无效后缀的股票代码验证。"""
-        with pytest.raises(InvalidStockCodeException, match="后6位应为数字"):
+        with pytest.raises(InvalidStockCodeError, match="后6位应为数字"):
             provider._validate_stock_code("sh00a000")
 
     async def test_validate_stock_code_empty(self, provider: ConcreteStockDataProvider) -> None:
         """测试空股票代码验证。"""
-        with pytest.raises(InvalidStockCodeException, match="应为8位字符"):
+        with pytest.raises(InvalidStockCodeError, match="应为8位字符"):
             provider._validate_stock_code("")
 
     async def test_context_manager_creates_session(self, config: ProviderConfig) -> None:

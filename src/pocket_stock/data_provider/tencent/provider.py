@@ -5,8 +5,8 @@ import aiohttp
 
 from pocket_stock.data_provider.config import ProviderConfig
 from pocket_stock.data_provider.exceptions import (
-    NetworkErrorException,
-    ProviderServiceErrorException,
+    NetworkError,
+    ProviderServiceError,
 )
 from pocket_stock.data_provider.models import StockQuote
 from pocket_stock.data_provider.provider import BaseStockDataProvider
@@ -65,8 +65,8 @@ class TencentStockDataProvider(BaseStockDataProvider):
             股票行情数据对象
 
         Raises:
-            NetworkErrorException: 当网络连接失败或超时时
-            ProviderServiceErrorException: 当 HTTP 状态码不是 200 时
+            NetworkError: 当网络连接失败或超时时
+            ProviderServiceError: 当 HTTP 状态码不是 200 时
         """
         if self.session is None:
             raise RuntimeError("会话未初始化，请使用 async with 语句或手动设置 session")
@@ -78,7 +78,7 @@ class TencentStockDataProvider(BaseStockDataProvider):
             async with self.session.get(url) as response:
                 # 检查 HTTP 状态码
                 if response.status != 200:
-                    raise ProviderServiceErrorException(
+                    raise ProviderServiceError(
                         stock_code=stock_code,
                         status_code=response.status,
                         reason=f"HTTP 状态码: {response.status}",
@@ -89,7 +89,7 @@ class TencentStockDataProvider(BaseStockDataProvider):
 
                 # 检查响应是否为空
                 if not text or text.strip() == "":
-                    raise NetworkErrorException(
+                    raise NetworkError(
                         stock_code=stock_code,
                         reason="数据提供者返回空响应",
                     )
@@ -98,13 +98,13 @@ class TencentStockDataProvider(BaseStockDataProvider):
                 return await self.parser.parse(text, stock_code)
 
         except aiohttp.ClientError as e:
-            raise NetworkErrorException(
+            raise NetworkError(
                 stock_code=stock_code,
                 reason=f"网络请求失败: {e}",
             ) from e
 
         except TimeoutError as e:
-            raise NetworkErrorException(
+            raise NetworkError(
                 stock_code=stock_code,
                 reason=f"请求超时（{self.config.timeout} 秒）",
             ) from e

@@ -4,6 +4,7 @@ from datetime import datetime
 from unittest.mock import Mock, patch
 
 import pytest
+from pydantic import ValidationError
 
 from pocket_stock.data_provider.models import StockQuote
 from pocket_stock.llm import analyse_stock
@@ -293,19 +294,40 @@ class TestLLMIntegration:
         with pytest.raises(LLMServiceError):
             analyse_stock(sample_stock_quote, sample_stock_news)
 
+    @patch("pocket_stock.llm.config.LLMConfig")
     def test_missing_configuration(
         self,
+        mock_llm_config_class: Mock,
         sample_stock_quote: StockQuote,
         sample_stock_news: StockSearchResponse,
-        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """测试缺少配置的场景。"""
-        # 清除环境变量
-        monkeypatch.delenv("OPENAI_MODEL", raising=False)
-        monkeypatch.delenv("OPENAI_API_BASE_URL", raising=False)
-        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        # 配置 LLMConfig 在初始化时抛出 ValidationError（模拟缺少环境变量）
+        mock_llm_config_class.side_effect = ValidationError.from_exception_data(
+            title="LLMConfig",
+            line_errors=[
+                {
+                    "type": "missing",
+                    "loc": ("OPENAI_MODEL",),
+                    "msg": "Field required",
+                    "input": {},
+                },
+                {
+                    "type": "missing",
+                    "loc": ("OPENAI_API_BASE_URL",),
+                    "msg": "Field required",
+                    "input": {},
+                },
+                {
+                    "type": "missing",
+                    "loc": ("OPENAI_API_KEY",),
+                    "msg": "Field required",
+                    "input": {},
+                },
+            ],
+        )
 
-        # 环境变量为空，配置加载应该失败
+        # 配置加载应该失败
         with pytest.raises(LLMAnalysisError):
             analyse_stock(sample_stock_quote, sample_stock_news)
 

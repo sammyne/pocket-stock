@@ -4,8 +4,8 @@ import pytest
 
 from pocket_stock.data_provider.config import ProviderConfig
 from pocket_stock.data_provider.exceptions import (
-    DataParseException,
-    InvalidStockCodeException,
+    DataParseError,
+    InvalidStockCodeError,
 )
 from pocket_stock.data_provider.models import StockQuote
 from pocket_stock.data_provider.tencent.provider import TencentStockDataProvider
@@ -57,13 +57,13 @@ class TestTencentStockDataProviderIntegration:
     async def test_invalid_stock_code(self, provider: TencentStockDataProvider) -> None:
         """测试无效的股票代码。"""
         async with provider:
-            with pytest.raises(InvalidStockCodeException):
+            with pytest.raises(InvalidStockCodeError):
                 await provider.get("invalid_code")
 
-            with pytest.raises(InvalidStockCodeException):
+            with pytest.raises(InvalidStockCodeError):
                 await provider.get("sh123")  # 长度不足
 
-            with pytest.raises(InvalidStockCodeException):
+            with pytest.raises(InvalidStockCodeError):
                 await provider.get("bj600000")  # 无效前缀
 
     async def test_non_existent_stock_code(self, provider: TencentStockDataProvider) -> None:
@@ -71,7 +71,7 @@ class TestTencentStockDataProviderIntegration:
         async with provider:
             # 使用一个可能不存在的股票代码
             # 腾讯财经会返回空数据，导致解析失败
-            with pytest.raises(DataParseException):
+            with pytest.raises(DataParseError):
                 await provider.get("sh999999")
 
     async def test_stock_quote_completeness(self, provider: TencentStockDataProvider) -> None:

@@ -8,9 +8,9 @@ import aiohttp
 
 from pocket_stock.data_provider.config import ProviderConfig
 from pocket_stock.data_provider.exceptions import (
-    InvalidStockCodeException,
-    NetworkErrorException,
-    ProviderServiceErrorException,
+    InvalidStockCodeError,
+    NetworkError,
+    ProviderServiceError,
 )
 from pocket_stock.data_provider.logger import log_error, log_request, log_response
 from pocket_stock.data_provider.models import StockQuote
@@ -99,9 +99,9 @@ class BaseStockDataProvider(abc.ABC):
             股票行情数据对象
 
         Raises:
-            NetworkErrorException: 网络错误
-            ProviderServiceErrorException: 服务错误
-            DataParseException: 数据解析错误
+            NetworkError: 网络错误
+            ProviderServiceError: 服务错误
+            DataParseError: 数据解析错误
         """
         pass
 
@@ -117,9 +117,9 @@ class BaseStockDataProvider(abc.ABC):
             股票行情数据对象
 
         Raises:
-            InvalidStockCodeException: 当股票代码无效时
-            NetworkErrorException: 当网络连接失败或超时时
-            ProviderServiceErrorException: 当数据提供者返回错误状态码时
+            InvalidStockCodeError: 当股票代码无效时
+            NetworkError: 当网络连接失败或超时时
+            ProviderServiceError: 当数据提供者返回错误状态码时
 
         Examples:
             >>> provider = MyProvider(ProviderConfig())
@@ -144,11 +144,11 @@ class BaseStockDataProvider(abc.ABC):
 
             return quote
 
-        except InvalidStockCodeException:
+        except InvalidStockCodeError:
             raise
-        except NetworkErrorException:
+        except NetworkError:
             raise
-        except ProviderServiceErrorException:
+        except ProviderServiceError:
             raise
         except Exception as e:
             # 记录错误日志
@@ -171,10 +171,10 @@ class BaseStockDataProvider(abc.ABC):
             stock_code: 待验证的股票代码
 
         Raises:
-            InvalidStockCodeException: 当股票代码格式不正确时抛出
+            InvalidStockCodeError: 当股票代码格式不正确时抛出
         """
         if not stock_code or len(stock_code) != 8:
-            raise InvalidStockCodeException(
+            raise InvalidStockCodeError(
                 f'无效的股票代码格式: "{stock_code}"，应为8位字符（如 sh600000 或 sz000001）'
             )
 
@@ -182,7 +182,7 @@ class BaseStockDataProvider(abc.ABC):
         suffix = stock_code[2:]
 
         if prefix not in ("sh", "sz"):
-            raise InvalidStockCodeException(f'无效的股票代码格式: "{stock_code}"，应以 "sh" 或 "sz" 开头')
+            raise InvalidStockCodeError(f'无效的股票代码格式: "{stock_code}"，应以 "sh" 或 "sz" 开头')
 
         if not suffix.isdigit():
-            raise InvalidStockCodeException(f'无效的股票代码格式: "{stock_code}"，后6位应为数字')
+            raise InvalidStockCodeError(f'无效的股票代码格式: "{stock_code}"，后6位应为数字')

@@ -8,7 +8,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 import httpx
@@ -22,7 +22,7 @@ from pocket_stock.search.exceptions import (
     ServiceError,
     ValidationError,
 )
-from pocket_stock.search.models import SearchConfig, SearchDepth, SearchResponse, SearchResult
+from pocket_stock.search.models import SearchOptions, SearchResponse, SearchResult
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class TavilySearchClient:
     def search(
         self,
         query: str,
-        config: Optional[SearchConfig] = None,
+        config: SearchOptions | None = None,
     ) -> SearchResponse:
         """执行同步搜索
 
@@ -69,7 +69,7 @@ class TavilySearchClient:
 
         # 使用默认配置
         if config is None:
-            config = SearchConfig()
+            config = SearchOptions()
 
         # 记录开始时间
         start_time = datetime.now()
@@ -101,22 +101,22 @@ class TavilySearchClient:
             logger.error(f"HTTP 错误: status_code={status_code}, message={e.response.text}")
 
             if status_code == 401:
-                raise AuthenticationError()
+                raise AuthenticationError() from e
             elif status_code == 429:
-                raise RateLimitError()
+                raise RateLimitError() from e
             else:
-                raise ServiceError(f"HTTP 错误: {status_code}", status_code=status_code)
+                raise ServiceError(f"HTTP 错误: {status_code}", status_code=status_code) from e
         except httpx.RequestError as e:
             logger.error(f"网络请求失败: {str(e)}")
-            raise NetworkError(f"网络请求失败: {str(e)}")
+            raise NetworkError(f"网络请求失败: {str(e)}") from e
         except json.JSONDecodeError as e:
             logger.error(f"JSON 解析失败: {str(e)}")
-            raise ServiceError(f"响应解析失败: {str(e)}")
+            raise ServiceError(f"响应解析失败: {str(e)}") from e
         except Exception as e:
             logger.error(f"搜索失败: {str(e)}")
-            raise ServiceError(f"搜索失败: {str(e)}")
+            raise ServiceError(f"搜索失败: {str(e)}") from e
 
-    def _build_search_params(self, query: str, config: SearchConfig) -> dict[str, Any]:
+    def _build_search_params(self, query: str, config: SearchOptions) -> dict[str, Any]:
         """构建搜索参数
 
         Args:
@@ -186,7 +186,7 @@ class TavilySearchClient:
             response_time=response_time,
         )
 
-    def _parse_date(self, date_str: Optional[str]) -> Optional[datetime]:
+    def _parse_date(self, date_str: str | None) -> datetime | None:
         """解析日期字符串
 
         Args:
@@ -221,7 +221,7 @@ class AsyncTavilySearchClient:
     async def search(
         self,
         query: str,
-        config: Optional[SearchConfig] = None,
+        config: SearchOptions | None = None,
     ) -> SearchResponse:
         """执行异步搜索
 
@@ -245,7 +245,7 @@ class AsyncTavilySearchClient:
 
         # 使用默认配置
         if config is None:
-            config = SearchConfig()
+            config = SearchOptions()
 
         # 记录开始时间
         start_time = datetime.now()
@@ -277,28 +277,28 @@ class AsyncTavilySearchClient:
             logger.error(f"HTTP 错误: status_code={status_code}, message={e.message}")
 
             if status_code == 401:
-                raise AuthenticationError()
+                raise AuthenticationError() from e
             elif status_code == 429:
-                raise RateLimitError()
+                raise RateLimitError() from e
             else:
-                raise ServiceError(f"HTTP 错误: {status_code}", status_code=status_code)
+                raise ServiceError(f"HTTP 错误: {status_code}", status_code=status_code) from e
         except aiohttp.ClientError as e:
             logger.error(f"网络请求失败: {str(e)}")
-            raise NetworkError(f"网络请求失败: {str(e)}")
+            raise NetworkError(f"网络请求失败: {str(e)}") from e
         except json.JSONDecodeError as e:
             logger.error(f"JSON 解析失败: {str(e)}")
-            raise ServiceError(f"响应解析失败: {str(e)}")
+            raise ServiceError(f"响应解析失败: {str(e)}") from e
         except asyncio.CancelledError:
             logger.warning("异步搜索被取消")
             raise
         except Exception as e:
             logger.error(f"搜索失败: {str(e)}")
-            raise ServiceError(f"搜索失败: {str(e)}")
+            raise ServiceError(f"搜索失败: {str(e)}") from e
 
     async def search_multiple(
         self,
         queries: list[str],
-        config: Optional[SearchConfig] = None,
+        config: SearchOptions | None = None,
     ) -> list[SearchResponse]:
         """并发执行多个搜索查询
 
@@ -327,7 +327,7 @@ class AsyncTavilySearchClient:
 
         return results
 
-    def _build_search_params(self, query: str, config: SearchConfig) -> dict[str, Any]:
+    def _build_search_params(self, query: str, config: SearchOptions) -> dict[str, Any]:
         """构建搜索参数
 
         Args:
@@ -397,7 +397,7 @@ class AsyncTavilySearchClient:
             response_time=response_time,
         )
 
-    def _parse_date(self, date_str: Optional[str]) -> Optional[datetime]:
+    def _parse_date(self, date_str: str | None) -> datetime | None:
         """解析日期字符串
 
         Args:

@@ -20,17 +20,17 @@ class DataProviderError(Exception):
         super().__init__(self.message)
 
 
-class InvalidStockCodeException(DataProviderError):
+class InvalidStockCodeError(DataProviderError):
     """股票代码无效异常。
 
     当传入的股票代码为空、格式不正确或不存在时抛出此异常。
 
     Examples:
-        >>> raise InvalidStockCodeException("股票代码不能为空")
+        >>> raise InvalidStockCodeError("股票代码不能为空")
     """
 
 
-class NetworkErrorException(DataProviderError):
+class NetworkError(DataProviderError):
     """网络错误异常。
 
     当网络连接失败、超时或发生其他网络相关错误时抛出此异常。
@@ -40,7 +40,7 @@ class NetworkErrorException(DataProviderError):
         reason: 错误原因
 
     Examples:
-        >>> raise NetworkErrorException("sh600000", "连接超时")
+        >>> raise NetworkError("sh600000", "连接超时")
     """
 
     def __init__(self, stock_code: str, reason: str) -> None:
@@ -55,7 +55,7 @@ class NetworkErrorException(DataProviderError):
         super().__init__(f"获取股票 {stock_code} 数据时发生网络错误: {reason}")
 
 
-class ProviderServiceErrorException(DataProviderError):
+class ProviderServiceError(DataProviderError):
     """数据提供者服务错误异常。
 
     当腾讯财经等数据提供者返回 HTTP 错误状态码时抛出此异常。
@@ -66,7 +66,7 @@ class ProviderServiceErrorException(DataProviderError):
         reason: 错误原因
 
     Examples:
-        >>> raise ProviderServiceErrorException("sh600000", 404, "资源未找到")
+        >>> raise ProviderServiceError("sh600000", 404, "资源未找到")
     """
 
     def __init__(self, stock_code: str, status_code: int, reason: str) -> None:
@@ -83,7 +83,7 @@ class ProviderServiceErrorException(DataProviderError):
         super().__init__(f"数据提供者返回错误（股票: {stock_code}, 状态码: {status_code}, 原因: {reason}）")
 
 
-class DataParseException(DataProviderError):
+class DataParseError(DataProviderError):
     """数据解析错误异常。
 
     当返回的数据格式不符合预期或解析失败时抛出此异常。
@@ -93,7 +93,7 @@ class DataParseException(DataProviderError):
         detail: 解析错误的详细信息
 
     Examples:
-        >>> raise DataParseException("sh600000", "JSON 格式错误")
+        >>> raise DataParseError("sh600000", "JSON 格式错误")
     """
 
     def __init__(self, stock_code: str, detail: str) -> None:
@@ -108,7 +108,7 @@ class DataParseException(DataProviderError):
         super().__init__(f"解析股票 {stock_code} 的数据时发生错误: {detail}")
 
 
-class DataValidationException(DataProviderError):
+class DataValidationError(DataProviderError):
     """数据验证错误异常。
 
     当数据验证失败时抛出此异常。
@@ -117,7 +117,7 @@ class DataValidationException(DataProviderError):
         message: 验证失败的详细信息
 
     Examples:
-        >>> raise DataValidationException("当前价格不能为负数")
+        >>> raise DataValidationError("当前价格不能为负数")
     """
 
     def __init__(self, message: str) -> None:

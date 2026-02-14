@@ -52,7 +52,7 @@ TAVILY_API_KEY=your_api_key_here
 ### 基本使用
 
 ```python
-from pocket_stock.search import SearchService, SearchConfig, SearchDepth, SearchTimeRange
+from pocket_stock.search import SearchService, SearchOptions, SearchDepth, SearchTimeRange
 
 # 初始化搜索服务
 service = SearchService()
@@ -73,10 +73,10 @@ for result in response.results:
 ### 使用配置
 
 ```python
-from pocket_stock.search import SearchService, SearchConfig, SearchDepth, SearchTimeRange
+from pocket_stock.search import SearchService, SearchOptions, SearchDepth, SearchTimeRange
 
 # 创建搜索配置
-config = SearchConfig(
+config = SearchOptions(
     max_results=10,
     search_depth=SearchDepth.ADVANCED,
     time_range=SearchTimeRange.WEEK,
@@ -96,7 +96,7 @@ if response.answer:
 
 ```python
 import asyncio
-from pocket_stock.search import SearchService, SearchConfig
+from pocket_stock.search import SearchService, SearchOptions
 
 async def main():
     # 初始化搜索服务
@@ -152,32 +152,32 @@ service = SearchService(api_key="your_api_key_here")
 
 #### 方法
 
-- `search(query: str, config: Optional[SearchConfig] = None) -> SearchResponse`
+- `search(query: str, config: Optional[SearchOptions] = None) -> SearchResponse`
   - 执行同步搜索
   - 参数：
     - `query`: 搜索查询字符串
     - `config`: 可选的搜索配置
   - 返回：搜索响应对象
 
-- `async search_async(query: str, config: Optional[SearchConfig] = None) -> SearchResponse`
+- `async search_async(query: str, config: Optional[SearchOptions] = None) -> SearchResponse`
   - 执行异步搜索
   - 参数同上
   - 返回：搜索响应对象
 
-- `async search_multiple_async(queries: list[str], config: Optional[SearchConfig] = None) -> list[SearchResponse]`
+- `async search_multiple_async(queries: list[str], config: Optional[SearchOptions] = None) -> list[SearchResponse]`
   - 并发执行多个搜索查询
   - 参数：
     - `queries`: 查询字符串列表
     - `config`: 可选的搜索配置
   - 返回：搜索响应列表
 
-### SearchConfig
+### SearchOptions
 
 搜索配置类，定义搜索的各种选项。
 
 #### 字段
 
-- `max_results`: 最大结果数量（1-20），默认 10
+- `max_results`: 最大结果数量（1-20），默认 5
 - `search_depth`: 搜索深度（`basic` 或 `advanced`），默认 `basic`
 - `time_range`: 搜索时间范围（`day`、`week`、`month`、`year`），默认 None
 - `include_domains`: 包含的域名列表

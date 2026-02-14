@@ -4,8 +4,8 @@ import pytest
 
 from pocket_stock.data_provider.config import ProviderConfig
 from pocket_stock.data_provider.exceptions import (
-    InvalidStockCodeException,
-    NetworkErrorException,
+    InvalidStockCodeError,
+    NetworkError,
 )
 from pocket_stock.data_provider.models import StockQuote
 from pocket_stock.data_provider.tencent.provider import TencentStockDataProvider
@@ -62,7 +62,7 @@ class TestStockDataProviderIntegration:
     async def test_invalid_stock_code(self, config: ProviderConfig) -> None:
         """测试无效股票代码。"""
         async with TencentStockDataProvider(config) as provider:
-            with pytest.raises(InvalidStockCodeException, match="无效的股票代码格式"):
+            with pytest.raises(InvalidStockCodeError, match="无效的股票代码格式"):
                 await provider.get("invalid_code")
 
     async def test_nonexistent_stock_code(self, config: ProviderConfig) -> None:
@@ -73,6 +73,6 @@ class TestStockDataProviderIntegration:
                 quote = await provider.get("sh999999")
                 # 如果返回数据，检查是否为空或无效
                 assert quote is not None
-            except (NetworkErrorException, Exception):
+            except (NetworkError, Exception):
                 # 某些情况下会抛出异常，这也是可以接受的
                 pass

@@ -6,7 +6,6 @@
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -37,7 +36,7 @@ class SearchResult(BaseModel):
     content: str = Field(description="搜索结果内容摘要")
     url: str = Field(description="来源 URL")
     source: str = Field(description="来源网站名称")
-    published_date: Optional[datetime] = Field(default=None, description="发布时间")
+    published_date: datetime | None = Field(default=None, description="发布时间")
     score: float = Field(default=0.0, description="相关性评分")
 
     @field_validator("url")
@@ -61,23 +60,23 @@ class SearchResult(BaseModel):
     model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
 
 
-class SearchConfig(BaseModel):
-    """搜索配置模型
+class SearchOptions(BaseModel):
+    """搜索选项模型
 
     定义搜索的配置选项，包括搜索深度、结果数量、时间范围等。
     """
 
-    max_results: int = Field(default=3, ge=1, le=20, description="最大结果数量，1-20")
+    max_results: int = Field(default=5, ge=1, le=20, description="最大结果数量，1-20")
     search_depth: SearchDepth = Field(default=SearchDepth.BASIC, description="搜索深度")
-    time_range: Optional[SearchTimeRange] = Field(default=None, description="搜索时间范围")
-    include_domains: Optional[list[str]] = Field(default=None, description="包含的域名列表")
-    exclude_domains: Optional[list[str]] = Field(default=None, description="排除的域名列表")
+    time_range: SearchTimeRange | None = Field(default=None, description="搜索时间范围")
+    include_domains: list[str] | None = Field(default=None, description="包含的域名列表")
+    exclude_domains: list[str] | None = Field(default=None, description="排除的域名列表")
     include_answer: bool = Field(default=False, description="是否包含 AI 生成的答案")
     include_raw_content: bool = Field(default=False, description="是否包含原始内容")
     include_images: bool = Field(default=False, description="是否包含图片")
 
     @model_validator(mode="after")
-    def validate_domains(self) -> "SearchConfig":
+    def validate_domains(self) -> "SearchOptions":
         """验证域名列表"""
         if self.include_domains:
             for domain in self.include_domains:
@@ -98,8 +97,8 @@ class SearchResponse(BaseModel):
 
     query: str = Field(description="搜索查询字符串")
     results: list[SearchResult] = Field(default_factory=list, description="搜索结果列表")
-    answer: Optional[str] = Field(default=None, description="AI 生成的答案")
-    images: Optional[list[str]] = Field(default=None, description="图片 URL 列表")
+    answer: str | None = Field(default=None, description="AI 生成的答案")
+    images: list[str] | None = Field(default=None, description="图片 URL 列表")
     response_time: float = Field(default=0.0, description="响应时间（秒）")
 
     @property

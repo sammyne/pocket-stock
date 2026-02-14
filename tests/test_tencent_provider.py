@@ -7,9 +7,9 @@ import pytest
 
 from pocket_stock.data_provider.config import ProviderConfig
 from pocket_stock.data_provider.exceptions import (
-    InvalidStockCodeException,
-    NetworkErrorException,
-    ProviderServiceErrorException,
+    InvalidStockCodeError,
+    NetworkError,
+    ProviderServiceError,
 )
 from pocket_stock.data_provider.models import StockQuote
 from pocket_stock.data_provider.tencent.provider import TencentStockDataProvider
@@ -79,7 +79,7 @@ class TestTencentStockDataProvider:
         mock_session.closed = False
         provider.session = mock_session
 
-        with pytest.raises(NetworkErrorException, match="网络请求失败"):
+        with pytest.raises(NetworkError, match="网络请求失败"):
             await provider._get("sh600000")
 
     async def test_get_with_timeout_error(
@@ -93,7 +93,7 @@ class TestTencentStockDataProvider:
         mock_session.closed = False
         provider.session = mock_session
 
-        with pytest.raises(NetworkErrorException, match="请求超时"):
+        with pytest.raises(NetworkError, match="请求超时"):
             await provider._get("sh600000")
     async def test_get_with_non_200_status(
         self, config: ProviderConfig
@@ -105,14 +105,13 @@ class TestTencentStockDataProvider:
         mock_response = AsyncMock()
         mock_response.status = 404
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_response.__aexit__ = AsyncMock(return_value=None)
+        mock_response.text = AsyncMock(return_value="Not Found")
         mock_session.get = MagicMock(return_value=mock_response)
         mock_session.closed = False
         provider.session = mock_session
 
-        with pytest.raises(ProviderServiceErrorException, match="HTTP 状态码: 404"):
+        with pytest.raises(ProviderServiceError, match="HTTP 状态码: 404"):
             await provider._get("sh600000")
-
     async def test_get_with_empty_response(
         self, config: ProviderConfig
     ) -> None:
@@ -124,14 +123,13 @@ class TestTencentStockDataProvider:
         mock_response.status = 200
         mock_response.text = AsyncMock(return_value="")
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_response.__aexit__ = AsyncMock(return_value=None)
+        mock_response.text = AsyncMock(return_value="")
         mock_session.get = MagicMock(return_value=mock_response)
         mock_session.closed = False
         provider.session = mock_session
 
-        with pytest.raises(NetworkErrorException, match="返回空响应"):
+        with pytest.raises(NetworkError, match="返回空响应"):
             await provider._get("sh600000")
-
     async def test_get_with_whitespace_response(
         self, config: ProviderConfig
     ) -> None:
@@ -148,7 +146,7 @@ class TestTencentStockDataProvider:
         mock_session.closed = False
         provider.session = mock_session
 
-        with pytest.raises(NetworkErrorException, match="返回空响应"):
+        with pytest.raises(NetworkError, match="返回空响应"):
             await provider._get("sh600000")
 
     async def test_api_url_format(self, provider: TencentStockDataProvider, mock_session: MagicMock) -> None:
@@ -177,7 +175,7 @@ class TestTencentStockDataProvider:
         provider.session = MagicMock(spec=aiohttp.ClientSession)
         provider.session.closed = False
 
-        with pytest.raises(InvalidStockCodeException):
+        with pytest.raises(InvalidStockCodeError):
             # 这个测试会在 _validate_stock_code 阶段就失败
             await provider.get("invalid")
 
