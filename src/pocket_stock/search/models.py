@@ -126,12 +126,8 @@ class SearchOptions(BaseModel):
         default=False, description="当 include_images 为 true 时，是否为每张图片添加描述文本"
     )
     include_favicon: bool = Field(default=False, description="是否包含每个结果的 favicon URL")
-    include_domains: list[str] | None = Field(
-        default=None, max_length=300, description="包含的域名列表，最多 300 个"
-    )
-    exclude_domains: list[str] | None = Field(
-        default=None, max_length=150, description="排除的域名列表，最多 150 个"
-    )
+    include_domains: list[str] | None = Field(default=None, max_length=300, description="包含的域名列表，最多 300 个")
+    exclude_domains: list[str] | None = Field(default=None, max_length=150, description="排除的域名列表，最多 150 个")
     country: str | None = Field(default="china", description="优先显示来自特定国家的内容，仅在 topic 为 general 时可用")
     auto_parameters: bool = Field(
         default=False,
@@ -211,9 +207,7 @@ class StockSearchResponse(BaseModel):
     """
 
     stock_name: str = Field(description="股票名称")
-    dimensions: dict[StockSearchDimension, SearchResponse] = Field(
-        default_factory=dict, description="各维度的搜索结果"
-    )
+    dimensions: dict[StockSearchDimension, SearchResponse] = Field(default_factory=dict, description="各维度的搜索结果")
     total_time: float = Field(default=0.0, description="总响应时间（秒）")
 
     @property

@@ -41,6 +41,7 @@ dev = [
     "black>=23.0.0",
     "mypy>=1.7.0",
     "ruff>=0.1.0",
+    "types-pyyaml>=6.0.12.20250915",
 ]
 
 [tool.setuptools.packages.find]
@@ -56,10 +57,6 @@ markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
 ]
 addopts = "-v --strict-markers"
-
-[tool.black]
-line-length = 120
-target-version = ['py313']
 
 [tool.ruff]
 line-length = 120
@@ -88,3 +85,18 @@ check_untyped_defs = true
 strict_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
+namespace_packages = true
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = "tavily.*"
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "src/pocket_stock/cli/web.py",
+]
+
+[tool.coverage.report]
+fail_under = 80

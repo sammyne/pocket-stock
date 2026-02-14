@@ -1,9 +1,6 @@
 """搜索配置单元测试。"""
 
-import json
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
@@ -187,7 +184,7 @@ class TestSearchConfigManager:
         assert config_manager.config_file.exists()
 
         # 验证文件内容是 YAML 格式
-        with open(config_manager.config_file, "r", encoding="utf-8") as f:
+        with open(config_manager.config_file, encoding="utf-8") as f:
             loaded_data = yaml.safe_load(f)
             assert loaded_data["max_results"] == 10
             assert loaded_data["search_depth"] == "advanced"
@@ -244,7 +241,7 @@ class TestSearchConfigManager:
         config_manager.save(config)
 
         # 读取文件内容，验证 YAML 格式
-        with open(config_manager.config_file, "r", encoding="utf-8") as f:
+        with open(config_manager.config_file, encoding="utf-8") as f:
             content = f.read()
             assert "china" in content
             assert "general" in content
@@ -260,26 +257,25 @@ class TestSearchSettings:
 
     def test_validate_api_key(self) -> None:
         """测试 API key 验证。"""
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ConfigurationError) as exc_info:
             SearchSettings(api_key="  ")
         assert "不能为空" in str(exc_info.value)
 
     def test_validate_success(self) -> None:
         """测试配置验证成功。"""
         settings = SearchSettings(api_key="test_api_key_123456789")
-        assert settings.validate() is True
+        assert settings.api_key == "test_api_key_123456789"
 
     def test_validate_empty_api_key(self) -> None:
         """测试空的 API key。"""
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ConfigurationError) as exc_info:
             SearchSettings(api_key="")
         assert "不能为空" in str(exc_info.value)
 
     def test_validate_short_api_key(self) -> None:
         """测试过短的 API key。"""
-        settings = SearchSettings(api_key="short")
         with pytest.raises(ConfigurationError) as exc_info:
-            settings.validate()
+            SearchSettings(api_key="short")
         assert "长度" in str(exc_info.value)
 
     def test_repr_masks_api_key(self) -> None:

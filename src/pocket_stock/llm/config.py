@@ -3,10 +3,8 @@
 提供 LLM 配置的加载和验证功能。
 """
 
-from typing import ClassVar
-
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .exceptions import ConfigurationError
 
@@ -25,7 +23,12 @@ class LLMConfig(BaseSettings):
         ConfigurationError: 当缺少必需的配置项时抛出。
     """
 
-    # 使用字段别名映射环境变量名
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
     openai_model: str = Field(
         ...,
         alias="OPENAI_MODEL",
@@ -41,13 +44,6 @@ class LLMConfig(BaseSettings):
         alias="OPENAI_API_KEY",
         description="访问 API 服务所需的密钥",
     )
-
-    # 环境变量文件配置
-    model_config: ClassVar[dict] = {
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
-        "extra": "ignore",
-    }
 
     @field_validator("openai_model")
     @classmethod

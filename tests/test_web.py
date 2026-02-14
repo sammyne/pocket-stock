@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -18,7 +19,6 @@ from pocket_stock.cli.web import (
     search_stock_news,
     validate_stock_code,
 )
-from datetime import date, timedelta
 from pocket_stock.data_provider.exceptions import (
     DataParseError,
     DataValidationError,
@@ -38,12 +38,24 @@ from pocket_stock.llm import (
 from pocket_stock.llm.models import ChecklistItem, PositionSuggestion
 from pocket_stock.search.exceptions import (
     AuthenticationError as SearchAuthenticationError,
+)
+from pocket_stock.search.exceptions import (
     ConfigurationError as SearchConfigurationError,
+)
+from pocket_stock.search.exceptions import (
     MissingAPIKeyError as SearchMissingAPIKeyError,
+)
+from pocket_stock.search.exceptions import (
     NetworkError as SearchNetworkError,
+)
+from pocket_stock.search.exceptions import (
     RateLimitError,
     SearchError,
+)
+from pocket_stock.search.exceptions import (
     ServiceError as SearchServiceError,
+)
+from pocket_stock.search.exceptions import (
     ValidationError as SearchValidationError,
 )
 
@@ -398,9 +410,7 @@ class TestFetchStockQuote:
             # 需要正确设置 async context manager
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
-            mock_provider.get = AsyncMock(
-                side_effect=NetworkError("sh600000", "Connection failed")
-            )
+            mock_provider.get = AsyncMock(side_effect=NetworkError("sh600000", "Connection failed"))
 
             with pytest.raises(NetworkError):
                 await fetch_stock_quote("sh600000")
@@ -413,9 +423,7 @@ class TestFetchStockQuote:
             # 需要正确设置 async context manager
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
-            mock_provider.get = AsyncMock(
-                side_effect=ProviderServiceError("sh600000", 500, "Server error")
-            )
+            mock_provider.get = AsyncMock(side_effect=ProviderServiceError("sh600000", 500, "Server error"))
 
             with pytest.raises(ProviderServiceError):
                 await fetch_stock_quote("sh600000")
@@ -475,9 +483,7 @@ class TestSearchStockNews:
         """测试搜索速率限制错误。"""
         with patch("pocket_stock.cli.web.SearchService") as mock_service_class:
             mock_service = MagicMock()
-            mock_service.search_stock = AsyncMock(
-                side_effect=RateLimitError(limit="100 requests per minute")
-            )
+            mock_service.search_stock = AsyncMock(side_effect=RateLimitError(limit="100 requests per minute"))
             mock_service_class.return_value = mock_service
 
             with pytest.raises(RateLimitError):
@@ -499,7 +505,6 @@ class TestAnalyseStockWithLLM:
 
         search_response = MagicMock()
         search_response.total_results = 10
-
 
         mock_result = StockAnalysisResult(
             stock_name="浦发银行",
@@ -584,10 +589,12 @@ class TestRenderStockQuote:
 
         # Mock streamlit components
         mock_st.subheader = MagicMock()
-        mock_st.columns = MagicMock(side_effect=[
-            [MagicMock(), MagicMock(), MagicMock(), MagicMock()],  # 主行
-            [MagicMock(), MagicMock(), MagicMock()],  # 详细信息行
-        ])
+        mock_st.columns = MagicMock(
+            side_effect=[
+                [MagicMock(), MagicMock(), MagicMock(), MagicMock()],  # 主行
+                [MagicMock(), MagicMock(), MagicMock()],  # 详细信息行
+            ]
+        )
         mock_st.metric = MagicMock()
         mock_st.expander = MagicMock()
         mock_st.write = MagicMock()
@@ -829,7 +836,7 @@ class TestSearchStockNewsWithDateRange:
     @pytest.mark.asyncio
     async def test_search_news_with_date_range(self) -> None:
         """测试带日期范围的成功搜索。"""
-        from pocket_stock.search.models import SearchOptions, SearchDepth, SearchTopic
+        from pocket_stock.search.models import SearchOptions
 
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 7)

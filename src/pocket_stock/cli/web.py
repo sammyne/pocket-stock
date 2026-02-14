@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import asyncio
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
+from typing import Any
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -30,19 +31,31 @@ from pocket_stock.llm import (
     NetworkConnectionError,
     StockAnalysisResult,
 )
+from pocket_stock.search.config import SearchConfigManager, SearchUserConfig
 from pocket_stock.search.exceptions import (
     AuthenticationError as SearchAuthenticationError,
+)
+from pocket_stock.search.exceptions import (
     ConfigurationError as SearchConfigurationError,
+)
+from pocket_stock.search.exceptions import (
     MissingAPIKeyError as SearchMissingAPIKeyError,
+)
+from pocket_stock.search.exceptions import (
     NetworkError as SearchNetworkError,
+)
+from pocket_stock.search.exceptions import (
     RateLimitError,
     SearchError,
+)
+from pocket_stock.search.exceptions import (
     ServiceError as SearchServiceError,
+)
+from pocket_stock.search.exceptions import (
     ValidationError as SearchValidationError,
 )
 from pocket_stock.search.models import StockSearchDimension, StockSearchResponse
 from pocket_stock.search.service import SearchService
-from pocket_stock.search.config import SearchConfigManager, SearchUserConfig
 
 # 加载 .env 文件
 load_dotenv()
@@ -125,7 +138,7 @@ async def search_stock_news(
     Raises:
         SearchError: 当搜索服务出现异常时抛出。
     """
-    from pocket_stock.search.models import SearchOptions, SearchDepth, SearchTopic
+    from pocket_stock.search.models import IncludeAnswerLevel, SearchDepth, SearchOptions, SearchTopic
 
     service = SearchService()
 
@@ -134,7 +147,7 @@ async def search_stock_news(
     user_config = config_manager.load()
 
     # 构建搜索配置字典，合并用户配置和时间范围
-    config_dict = {
+    config_dict: dict[str, Any] = {
         "max_results": user_config.max_results,
         "search_depth": SearchDepth(user_config.search_depth),
         "chunks_per_source": user_config.chunks_per_source,
@@ -144,7 +157,7 @@ async def search_stock_news(
     # 处理 include_answer 配置
     include_answer_level = user_config.include_answer_level
     if include_answer_level and include_answer_level != "disabled":
-        config_dict["include_answer"] = SearchDepth(include_answer_level)
+        config_dict["include_answer"] = IncludeAnswerLevel(include_answer_level)
     else:
         config_dict["include_answer"] = False
 
@@ -203,17 +216,26 @@ def render_stock_quote(quote: StockQuote) -> None:
         st.metric("股票名称", quote.name)
 
     with col3:
-        change_color = "normal" if quote.change >= 0 else "inverse"
-        st.metric("当前价格", f"{quote.current_price:.2f} 元", delta=f"{quote.change:+.2f}", delta_color=change_color)
+        if quote.change is not None:
+            st.metric(
+                "当前价格",
+                f"{quote.current_price:.2f} 元",
+                delta=f"{quote.change:+.2f}",
+                delta_color="normal" if quote.change >= 0 else "inverse",
+            )
+        else:
+            st.metric("当前价格", f"{quote.current_price:.2f} 元")
 
     with col4:
-        change_percent_color = "normal" if quote.change_percent >= 0 else "inverse"
-        st.metric(
-            "涨跌幅",
-            f"{quote.change_percent:+.2f}%",
-            delta=f"{quote.change:+.2f} 元",
-            delta_color=change_percent_color,
-        )
+        if quote.change_percent is not None:
+            st.metric(
+                "涨跌幅",
+                f"{quote.change_percent:+.2f}%",
+                delta=f"{quote.change:+.2f} 元",
+                delta_color="normal" if quote.change_percent >= 0 else "inverse",
+            )
+        else:
+            st.metric("涨跌幅", f"{quote.change_percent:+.2f}%")
 
     # 详细信息
     with st.expander("查看详细信息"):
@@ -241,7 +263,9 @@ def render_stock_quote(quote: StockQuote) -> None:
             st.write(f"**更新时间**: {quote.timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
-def render_search_results(response: StockSearchResponse, date_start: date | None = None, date_end: date | None = None) -> None:
+def render_search_results(
+    response: StockSearchResponse, date_start: date | None = None, date_end: date | None = None
+) -> None:
     """渲染搜索结果。
 
     Args:
@@ -278,7 +302,9 @@ def render_search_results(response: StockSearchResponse, date_start: date | None
             else:
                 st.info("暂无相关结果")
 
-    st.caption(f"总结果数: {response.total_results} | 搜索维度: {response.dimension_count} | 耗时: {response.total_time:.2f}秒")
+    st.caption(
+        f"总结果数: {response.total_results} | 搜索维度: {response.dimension_count} | 耗时: {response.total_time:.2f}秒"
+    )
 
 
 def render_analysis_result(result: StockAnalysisResult) -> None:
@@ -310,7 +336,9 @@ def render_analysis_result(result: StockAnalysisResult) -> None:
         buy_price = f"{result.target_prices.buy_price:.2f} 元" if result.target_prices.buy_price else "-"
         st.metric("💰 买入价", buy_price)
     with col2:
-        stop_loss_price = f"{result.target_prices.stop_loss_price:.2f} 元" if result.target_prices.stop_loss_price else "-"
+        stop_loss_price = (
+            f"{result.target_prices.stop_loss_price:.2f} 元" if result.target_prices.stop_loss_price else "-"
+        )
         st.metric("🛑 止损价", stop_loss_price)
     with col3:
         target_price = f"{result.target_prices.target_price:.2f} 元" if result.target_prices.target_price else "-"
@@ -648,7 +676,7 @@ def _render_search_config_form() -> None:
     # 配置项 2：搜索深度
     st.markdown("#### 搜索深度")
     depth_options = _get_search_depth_options()
-    depth_display_options = [opt[0] for opt in depth_options]
+    [opt[0] for opt in depth_options]
     depth_values = [opt[1] for opt in depth_options]
 
     search_depth = st.selectbox(
@@ -698,7 +726,7 @@ def _render_search_config_form() -> None:
     # 配置项 4：搜索主题
     st.markdown("#### 搜索主题")
     topic_options = _get_topic_options()
-    topic_display_options = [opt[0] for opt in topic_options]
+    [opt[0] for opt in topic_options]
     topic_values = [opt[1] for opt in topic_options]
 
     topic = st.selectbox(
@@ -720,7 +748,7 @@ def _render_search_config_form() -> None:
     # 配置项 5：包含的 AI 答案级别
     st.markdown("#### 包含的 AI 答案级别")
     answer_level_options = _get_answer_level_options()
-    answer_level_display_options = [opt[0] for opt in answer_level_options]
+    [opt[0] for opt in answer_level_options]
     answer_level_values = [opt[1] for opt in answer_level_options]
 
     answer_level = st.selectbox(
@@ -743,7 +771,7 @@ def _render_search_config_form() -> None:
     st.markdown("#### 优先显示的国家")
     if st.session_state.search_topic == "general":
         country_options = _get_country_options()
-        country_display_options = [opt[0] for opt in country_options]
+        [opt[0] for opt in country_options]
         country_values = [opt[1] for opt in country_options]
 
         country = st.selectbox(
@@ -779,7 +807,9 @@ def _save_search_config(config_manager: SearchConfigManager) -> None:
         chunks_per_source=st.session_state.search_chunks_per_source,
         topic=st.session_state.search_topic,
         include_answer=st.session_state.search_include_answer_level != "disabled",
-        include_answer_level=st.session_state.search_include_answer_level if st.session_state.search_include_answer_level != "disabled" else None,
+        include_answer_level=st.session_state.search_include_answer_level
+        if st.session_state.search_include_answer_level != "disabled"
+        else None,
         country=st.session_state.search_country if st.session_state.search_topic == "general" else "china",
     )
 
