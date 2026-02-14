@@ -1,0 +1,74 @@
+name: Sync to GitCode
+
+on:
+  # 在推送到 main 或 dev 分支时触发
+  push:
+    branches:
+      - main
+      - dev
+  # 在创建或更新 Pull Request 时触发
+  # pull_request:
+  #   branches:
+  #     - main
+  # 允许手动触发
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # 获取完整的 git 历史记录
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "sammyne"
+          git config --global user.email "xiangmin-li@qq.com"
+
+      - name: Setup SSH for GitCode
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GITCODE_SSH_PRIVATE_KEY }}" > ~/.ssh/gitcode_key
+          chmod 600 ~/.ssh/gitcode_key
+          ssh-keyscan -H gitcode.com >> ~/.ssh/known_hosts
+          # 配置 SSH config 文件，指定 gitcode.com 使用专用密钥
+          cat >> ~/.ssh/config <<EOF
+          Host gitcode.com
+            HostName gitcode.com
+            User git
+            IdentityFile ~/.ssh/gitcode_key
+            StrictHostKeyChecking no
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Verify SSH connection to GitCode
+        run: |
+          echo "Testing SSH connection to gitcode.com..."
+          ssh -T git@gitcode.com || echo "SSH connection test completed"
+
+      - name: Add GitCode remote
+        run: |
+          git remote add gitcode git@gitcode.com:sammyne/pocket-stock.git
+
+      - name: Sync main branch to gitcode/github
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "Syncing main branch to gitcode/github"
+          git checkout -B main origin/main || git checkout -B main
+          git push gitcode main:github -f --no-verify
+      
+      - name: Sync dev branch to gitcode/github-dev
+        if: github.ref == 'refs/heads/dev'
+        run: |
+          echo "Syncing dev branch to gitcode/github-dev"
+          git checkout -B dev origin/dev || git checkout -B dev
+          git push gitcode dev:github-dev -f --no-verify
+
+      - name: Cleanup SSH key
+        if: always()
+        run: |
+          rm -f ~/.ssh/gitcode_key
