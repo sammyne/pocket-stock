@@ -50,7 +50,7 @@ st.set_page_config(
     page_title="Pocket Stock - 股票分析",
     page_icon="📈",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 
@@ -372,10 +372,19 @@ def _format_turnover(turnover: float | None) -> str:
         return f"{turnover:.2f} 元"
 
 
-def main() -> None:
-    """Streamlit 应用主入口。
+def render_settings_page() -> None:
+    """渲染设置页面。
 
-    该函数是 Web 应用的入口点，负责处理用户输入并展示分析结果。
+    该函数负责显示设置页面的内容。
+    """
+    st.title("⚙️ 设置")
+    st.info("设置页面功能正在开发中...")
+
+
+def render_home_page() -> None:
+    """渲染主页 - 股票分析功能。
+
+    该函数负责处理用户输入并展示分析结果，包括股票行情、新闻和AI分析。
     """
     st.title("📈 Pocket Stock - 股票分析")
     st.markdown("输入股票代码，获取实时行情、相关新闻和 AI 智能分析")
@@ -454,6 +463,40 @@ def main() -> None:
 
         with tab3:
             render_analysis_result(analysis_result)
+
+
+def main() -> None:
+    """Streamlit 应用主入口。
+
+    该函数是 Web 应用的入口点，负责处理页面导航和路由。
+    """
+    # 侧边栏导航
+    with st.sidebar:
+        st.title("📈 Pocket Stock")
+
+        # 使用 session state 存储当前页面
+        if "current_page" not in st.session_state:
+            st.session_state.current_page = "home"
+
+        # 页面导航菜单
+        page = st.radio(
+            "导航",
+            ["🏠 主页", "⚙️ 设置"],
+            index=0 if st.session_state.current_page == "home" else 1,
+            key="page_navigation",
+        )
+
+        # 更新当前页面
+        if page == "🏠 主页":
+            st.session_state.current_page = "home"
+        else:
+            st.session_state.current_page = "settings"
+
+    # 根据选择的页面渲染内容
+    if st.session_state.current_page == "home":
+        render_home_page()
+    else:
+        render_settings_page()
 
 
 if __name__ == "__main__":
