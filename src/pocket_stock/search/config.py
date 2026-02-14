@@ -3,15 +3,16 @@
 处理搜索模块的配置加载和验证，使用 pydantic-settings 进行配置管理。
 """
 
-import yaml
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import yaml
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from pocket_stock.search.exceptions import ConfigurationError
+
 
 class SearchSettings(BaseSettings):
     """搜索配置类，基于 pydantic-settings 的 BaseSettings
@@ -40,28 +41,16 @@ class SearchSettings(BaseSettings):
             验证后的 API key
 
         Raises:
-            ValueError: 当 API key 为空或格式不正确时抛出
+            ConfigurationError: 当 API key 为空或格式不正确时抛出
         """
         if not v or not v.strip():
-            raise ValueError("API key 不能为空")
-        return v.strip()
-
-    def validate(self) -> bool:
-        """验证配置是否有效
-
-        Returns:
-            如果配置有效返回 True
-
-        Raises:
-            ConfigurationError: 当配置无效时抛出
-        """
-        if not self.api_key:
             raise ConfigurationError("API key 不能为空")
 
-        if len(self.api_key) < 10:
+        key = v.strip()
+        if len(key) < 10:
             raise ConfigurationError("API key 长度似乎不正确")
 
-        return True
+        return key
 
     def __repr__(self) -> str:
         """返回配置的字符串表示
@@ -193,10 +182,10 @@ class SearchConfigManager:
             return SearchUserConfig()
 
         try:
-            with open(self.config_file, "r", encoding="utf-8") as f:
+            with open(self.config_file, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             return SearchUserConfig.from_dict(data if data else {})
-        except (yaml.YAMLError, IOError) as e:
+        except (OSError, yaml.YAMLError):
             # 配置文件损坏，返回默认配置
             return SearchUserConfig()
 
@@ -213,7 +202,7 @@ class SearchConfigManager:
             # 验证配置
             is_valid, error_msg = config.validate()
             if not is_valid:
-                raise ConfigurationError(error_msg)
+                raise ConfigurationError(error_msg or "配置验证失败")
 
             # 写入配置文件
             with open(self.config_file, "w", encoding="utf-8") as f:
@@ -226,7 +215,7 @@ class SearchConfigManager:
                     sort_keys=False,
                 )
             return True
-        except (IOError, ConfigurationError) as e:
+        except (OSError, ConfigurationError):
             return False
 
     def reset(self) -> bool:
@@ -239,7 +228,7 @@ class SearchConfigManager:
             if self.config_file.exists():
                 self.config_file.unlink()
             return True
-        except IOError:
+        except OSError:
             return False
 
     def get_config_file_path(self) -> Path:

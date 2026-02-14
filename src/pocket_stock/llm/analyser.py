@@ -6,7 +6,7 @@
 from typing import Self
 
 from langchain_openai import ChatOpenAI
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from pocket_stock.data_provider.models import StockQuote
 from pocket_stock.llm.config import LLMConfig
@@ -49,7 +49,7 @@ class LLMStockAnalyser:
         Raises:
             ConfigurationError: 当配置无效时抛出。
         """
-        self._config = config or LLMConfig()
+        self._config = config or LLMConfig()  # type: ignore[call-arg]
         self._llm = self._create_llm_instance()
 
     @classmethod
@@ -63,7 +63,7 @@ class LLMStockAnalyser:
             ConfigurationError: 当环境变量配置无效时抛出。
         """
         try:
-            config = LLMConfig()
+            config = LLMConfig()  # type: ignore[call-arg]
         except ValidationError as e:
             # 将 pydantic 的 ValidationError 转换为项目自定义的 ConfigurationError
             error_msg = "; ".join(f"{error['loc'][0]}: {error['msg']}" for error in e.errors())
@@ -79,7 +79,7 @@ class LLMStockAnalyser:
         return ChatOpenAI(
             model=self._config.openai_model,
             base_url=self._config.openai_api_base_url,
-            api_key=self._config.openai_api_key,
+            api_key=SecretStr(self._config.openai_api_key),
             temperature=0.3,  # 降低温度以获得更稳定的输出
             timeout=30,  # 30 秒超时
         )
@@ -93,11 +93,11 @@ class LLMStockAnalyser:
         return ChatOpenAI(
             model=self._config.openai_model,
             base_url=self._config.openai_api_base_url,
-            api_key=self._config.openai_api_key,
+            api_key=SecretStr(self._config.openai_api_key),
             temperature=0.3,
             timeout=30,
             verbose=True,
-        ).with_structured_output(StockAnalysisResult)
+        ).with_structured_output(StockAnalysisResult)  # type: ignore[return-value]
 
     def _build_prompt(self, stock_quote: StockQuote, stock_news: StockSearchResponse) -> str:
         """构建 LLM 提示词。
@@ -219,7 +219,7 @@ class LLMStockAnalyser:
         try:
             # 调用 LLM API 并直接获取结构化输出
             result = structured_llm.invoke(prompt)
-            return result
+            return result  # type: ignore[return-value]
 
         except TimeoutError as e:
             raise LLMApiTimeoutError(f"LLM API 调用超时: {e}") from e

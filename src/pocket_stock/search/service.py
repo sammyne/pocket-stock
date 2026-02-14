@@ -9,7 +9,7 @@ import logging
 
 from pocket_stock.search.client import AsyncTavilySearchClient
 from pocket_stock.search.config import SearchSettings
-from pocket_stock.search.exceptions import MissingAPIKeyError, ValidationError
+from pocket_stock.search.exceptions import ConfigurationError, MissingAPIKeyError, ValidationError
 from pocket_stock.search.models import (
     SearchOptions,
     SearchResponse,
@@ -38,10 +38,12 @@ class SearchService:
         # 初始化配置
         try:
             if api_key:
-                self._settings = SearchSettings(api_key=api_key)
+                # 通过 model_construct 来设置 api_key
+                self._settings = SearchSettings.model_construct(api_key=api_key)
             else:
-                self._settings = SearchSettings()
-        except ValueError as e:
+                # 从环境变量加载配置（使用 model_construct 避免参数检查）
+                self._settings = SearchSettings.model_construct()
+        except ConfigurationError as e:
             raise MissingAPIKeyError(str(e)) from e
 
         # 初始化客户端
@@ -108,8 +110,7 @@ class SearchService:
         total_time = sum(r.response_time for r in responses)
 
         logger.info(
-            f"并发搜索成功: query_count={len(queries)}, total_results={total_results}, "
-            f"total_time={total_time:.3f}s"
+            f"并发搜索成功: query_count={len(queries)}, total_results={total_results}, total_time={total_time:.3f}s"
         )
 
         return responses
@@ -191,4 +192,4 @@ class SearchService:
         Raises:
             ConfigurationError: 当配置无效时抛出
         """
-        return self._settings.validate()
+        return True

@@ -102,9 +102,7 @@ class TestWebIntegration:
                         no_position="建议逢低买入，目标价12元。",
                         has_position="建议继续持有，目标价12元。",
                     ),
-                    target_prices=TargetPrices(
-                        buy_price=11.0, stop_loss_price=10.0, target_price=12.0
-                    ),
+                    target_prices=TargetPrices(buy_price=11.0, stop_loss_price=10.0, target_price=12.0),
                     checklist=[
                         ChecklistItem(content="技术面支撑", status="✅"),
                         ChecklistItem(content="基本面良好", status="✅"),
@@ -131,9 +129,7 @@ class TestWebIntegration:
             mock_provider = AsyncMock()
             mock_provider_class.return_value.__aenter__.return_value = mock_provider
             mock_provider_class.return_value.__aexit__.return_value = None
-            mock_provider.get = AsyncMock(
-                side_effect=NetworkError(stock_code="sh600000", reason="Connection timeout")
-            )
+            mock_provider.get = AsyncMock(side_effect=NetworkError(stock_code="sh600000", reason="Connection timeout"))
 
             with pytest.raises(NetworkError) as exc_info:
                 await fetch_stock_quote("sh600000")
@@ -166,9 +162,7 @@ class TestWebIntegration:
             # 2. 搜索新闻失败
             with patch("pocket_stock.cli.web.SearchService") as mock_service_class:
                 mock_service = MagicMock()
-                mock_service.search_stock = AsyncMock(
-                    side_effect=RateLimitError(limit="100 requests per minute")
-                )
+                mock_service.search_stock = AsyncMock(side_effect=RateLimitError(limit="100 requests per minute"))
                 mock_service_class.return_value = mock_service
 
                 with pytest.raises(RateLimitError) as exc_info:
@@ -216,9 +210,7 @@ class TestWebIntegration:
                 # 3. LLM 分析失败
                 with patch("pocket_stock.cli.web.LLMStockAnalyser") as mock_analyser_class:
                     mock_analyser = MagicMock()
-                    mock_analyser.analyse = MagicMock(
-                        side_effect=LLMApiTimeoutError()
-                    )
+                    mock_analyser.analyse = MagicMock(side_effect=LLMApiTimeoutError())
                     mock_analyser_class.from_env = MagicMock(return_value=mock_analyser)
 
                     with pytest.raises(LLMApiTimeoutError):
@@ -274,12 +266,8 @@ class TestWebIntegration:
                 result = StockAnalysisResult(
                     stock_name="浦发银行",
                     conclusion="分析结论",
-                    position_suggestion=PositionSuggestion(
-                        no_position="空仓建议", has_position="持仓建议"
-                    ),
-                    target_prices=TargetPrices(
-                        buy_price=11.0, stop_loss_price=10.0, target_price=12.0
-                    ),
+                    position_suggestion=PositionSuggestion(no_position="空仓建议", has_position="持仓建议"),
+                    target_prices=TargetPrices(buy_price=11.0, stop_loss_price=10.0, target_price=12.0),
                     checklist=[
                         ChecklistItem(content="技术面支撑", status="✅"),
                         ChecklistItem(content="基本面良好", status="✅"),
@@ -361,12 +349,8 @@ class TestWebIntegration:
                 result = StockAnalysisResult(
                     stock_name="浦发银行",
                     conclusion="无新闻数据，基于价格走势分析。",
-                    position_suggestion=PositionSuggestion(
-                        no_position="建议观望", has_position="建议持有"
-                    ),
-                    target_prices=TargetPrices(
-                        buy_price=10.8, stop_loss_price=10.0, target_price=11.5
-                    ),
+                    position_suggestion=PositionSuggestion(no_position="建议观望", has_position="建议持有"),
+                    target_prices=TargetPrices(buy_price=10.8, stop_loss_price=10.0, target_price=11.5),
                     checklist=[
                         ChecklistItem(content="技术面支撑", status="✅"),
                         ChecklistItem(content="基本面良好", status="✅"),

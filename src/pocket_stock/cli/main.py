@@ -15,11 +15,13 @@ from dotenv import load_dotenv
 from pocket_stock.cli.formatter import format_stock_quote
 from pocket_stock.data_provider.config import ProviderConfig
 from pocket_stock.data_provider.exceptions import (
-    DataParseException,
-    DataValidationException,
-    InvalidStockCodeException,
-    NetworkErrorException,
-    ProviderServiceErrorException,
+    DataParseError,
+    DataValidationError,
+    InvalidStockCodeError,
+    ProviderServiceError,
+)
+from pocket_stock.data_provider.exceptions import (
+    NetworkError as ProviderNetworkError,
 )
 from pocket_stock.data_provider.models import StockQuote
 from pocket_stock.data_provider.tencent.provider import TencentStockDataProvider
@@ -166,9 +168,9 @@ async def fetch_stock_quote(stock_code: str, timeout: float) -> StockQuote:
         股票行情数据对象
 
     Raises:
-        InvalidStockCodeException: 股票代码无效
-        NetworkErrorException: 网络错误
-        ProviderServiceErrorException: 服务错误
+        InvalidStockCodeError: 股票代码无效
+        NetworkError: 网络错误
+        ProviderServiceError: 服务错误
     """
     config = ProviderConfig(timeout=timeout)
     async with TencentStockDataProvider(config) as provider:
@@ -188,29 +190,29 @@ def handle_exception(e: Exception, stock_code: str | None = None) -> int:
     """
     code = stock_code if stock_code else "未知"
 
-    if isinstance(e, InvalidStockCodeException):
+    if isinstance(e, InvalidStockCodeError):
         print("错误: 股票代码格式无效", file=sys.stderr)
         print(f"  股票代码: {code}", file=sys.stderr)
         print("  提示: 格式应为 sh 或 sz 开头，后跟 6 位数字，如 sh600000", file=sys.stderr)
         return 1
 
-    if isinstance(e, NetworkErrorException):
+    if isinstance(e, ProviderNetworkError):
         print("错误: 网络连接失败", file=sys.stderr)
         print(f"  股票代码: {code}", file=sys.stderr)
         print(f"  原因: {e.reason}", file=sys.stderr)
         return 2
 
-    if isinstance(e, ProviderServiceErrorException):
+    if isinstance(e, ProviderServiceError):
         print("错误: 数据服务异常", file=sys.stderr)
         print(f"  股票代码: {code}", file=sys.stderr)
         print(f"  状态码: {e.status_code}", file=sys.stderr)
         print(f"  原因: {e.reason}", file=sys.stderr)
         return 3
 
-    if isinstance(e, (DataParseException, DataValidationException)):
+    if isinstance(e, (DataParseError, DataValidationError)):
         print("错误: 数据解析失败", file=sys.stderr)
         print(f"  股票代码: {code}", file=sys.stderr)
-        print(f"  详情: {e.message if isinstance(e, DataValidationException) else e.detail}", file=sys.stderr)
+        print(f"  详情: {e.message if isinstance(e, DataValidationError) else e.detail}", file=sys.stderr)
         return 4
 
     # 处理搜索服务异常
@@ -394,11 +396,11 @@ async def async_main() -> int:
         return 0
 
     except (
-        InvalidStockCodeException,
-        NetworkErrorException,
-        ProviderServiceErrorException,
-        DataParseException,
-        DataValidationException,
+        InvalidStockCodeError,
+        ProviderNetworkError,
+        ProviderServiceError,
+        DataParseError,
+        DataValidationError,
     ) as e:
         return handle_exception(e, stock_code)
 

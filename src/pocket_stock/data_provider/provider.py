@@ -174,9 +174,7 @@ class BaseStockDataProvider(abc.ABC):
             InvalidStockCodeError: 当股票代码格式不正确时抛出
         """
         if not stock_code or len(stock_code) != 8:
-            raise InvalidStockCodeError(
-                f'无效的股票代码格式: "{stock_code}"，应为8位字符（如 sh600000 或 sz000001）'
-            )
+            raise InvalidStockCodeError(f'无效的股票代码格式: "{stock_code}"，应为8位字符（如 sh600000 或 sz000001）')
 
         prefix = stock_code[:2].lower()
         suffix = stock_code[2:]

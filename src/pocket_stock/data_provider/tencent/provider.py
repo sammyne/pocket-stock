@@ -1,6 +1,5 @@
 """腾讯财经数据提供者。"""
 
-
 import aiohttp
 
 from pocket_stock.data_provider.config import ProviderConfig
@@ -108,4 +107,3 @@ class TencentStockDataProvider(BaseStockDataProvider):
                 stock_code=stock_code,
                 reason=f"请求超时（{self.config.timeout} 秒）",
             ) from e
-

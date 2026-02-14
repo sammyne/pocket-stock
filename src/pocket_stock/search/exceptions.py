@@ -86,9 +86,7 @@ class RateLimitError(ServiceError):
     当达到 API 速率限制时抛出。
     """
 
-    def __init__(
-        self, message: str = "达到 API 速率限制", *args: object, limit: int | None = None
-    ) -> None:
+    def __init__(self, message: str = "达到 API 速率限制", *args: object, limit: int | None = None) -> None:
         """初始化速率限制异常
 
         Args:

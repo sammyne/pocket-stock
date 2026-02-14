@@ -47,9 +47,7 @@ class TestTencentStockDataProvider:
         session.closed = False
         return session
 
-    async def test_get_normal_flow(
-        self, provider: TencentStockDataProvider, mock_session: MagicMock
-    ) -> None:
+    async def test_get_normal_flow(self, provider: TencentStockDataProvider, mock_session: MagicMock) -> None:
         """测试正常数据获取流程。"""
         provider.session = mock_session
 
@@ -61,16 +59,12 @@ class TestTencentStockDataProvider:
         assert quote.current_price == 10.25
         assert quote.change == 0.15
 
-    async def test_get_without_session_raises_error(
-        self, provider: TencentStockDataProvider
-    ) -> None:
+    async def test_get_without_session_raises_error(self, provider: TencentStockDataProvider) -> None:
         """测试未初始化会话时抛出错误。"""
         with pytest.raises(RuntimeError, match="会话未初始化"):
             await provider.get("sh600000")
 
-    async def test_get_with_network_error(
-        self, config: ProviderConfig
-    ) -> None:
+    async def test_get_with_network_error(self, config: ProviderConfig) -> None:
         """测试网络错误处理。"""
         provider = TencentStockDataProvider(config)
 
@@ -82,9 +76,7 @@ class TestTencentStockDataProvider:
         with pytest.raises(NetworkError, match="网络请求失败"):
             await provider._get("sh600000")
 
-    async def test_get_with_timeout_error(
-        self, config: ProviderConfig
-    ) -> None:
+    async def test_get_with_timeout_error(self, config: ProviderConfig) -> None:
         """测试请求超时处理。"""
         provider = TencentStockDataProvider(config)
 
@@ -95,9 +87,8 @@ class TestTencentStockDataProvider:
 
         with pytest.raises(NetworkError, match="请求超时"):
             await provider._get("sh600000")
-    async def test_get_with_non_200_status(
-        self, config: ProviderConfig
-    ) -> None:
+
+    async def test_get_with_non_200_status(self, config: ProviderConfig) -> None:
         """测试非 200 状态码处理。"""
         provider = TencentStockDataProvider(config)
 
@@ -112,9 +103,8 @@ class TestTencentStockDataProvider:
 
         with pytest.raises(ProviderServiceError, match="HTTP 状态码: 404"):
             await provider._get("sh600000")
-    async def test_get_with_empty_response(
-        self, config: ProviderConfig
-    ) -> None:
+
+    async def test_get_with_empty_response(self, config: ProviderConfig) -> None:
         """测试空响应处理。"""
         provider = TencentStockDataProvider(config)
 
@@ -130,9 +120,8 @@ class TestTencentStockDataProvider:
 
         with pytest.raises(NetworkError, match="返回空响应"):
             await provider._get("sh600000")
-    async def test_get_with_whitespace_response(
-        self, config: ProviderConfig
-    ) -> None:
+
+    async def test_get_with_whitespace_response(self, config: ProviderConfig) -> None:
         """测试空白响应处理。"""
         provider = TencentStockDataProvider(config)
 
@@ -158,9 +147,7 @@ class TestTencentStockDataProvider:
         # 验证调用的 URL
         mock_session.get.assert_called_once_with("https://qt.gtimg.cn/q=sh600000")
 
-    async def test_parser_integration(
-        self, provider: TencentStockDataProvider, mock_session: MagicMock
-    ) -> None:
+    async def test_parser_integration(self, provider: TencentStockDataProvider, mock_session: MagicMock) -> None:
         """测试解析器集成。"""
         provider.session = mock_session
 
@@ -179,9 +166,7 @@ class TestTencentStockDataProvider:
             # 这个测试会在 _validate_stock_code 阶段就失败
             await provider.get("invalid")
 
-    async def test_context_manager_integration(
-        self, config: ProviderConfig, mock_session: MagicMock
-    ) -> None:
+    async def test_context_manager_integration(self, config: ProviderConfig, mock_session: MagicMock) -> None:
         """测试上下文管理器集成。"""
         provider = TencentStockDataProvider(config, session=mock_session)
 

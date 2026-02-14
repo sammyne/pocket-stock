@@ -155,9 +155,7 @@ class TestBaseStockDataProvider:
                     mock_log_request.assert_called_once_with("sh600000", timeout=10.0)
                     mock_log_response.assert_called_once()
 
-    async def test_get_logs_error(
-        self, provider: ConcreteStockDataProvider, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    async def test_get_logs_error(self, provider: ConcreteStockDataProvider, caplog: pytest.LogCaptureFixture) -> None:
         """测试 get 方法记录错误日志。"""
         with patch("pocket_stock.data_provider.provider.log_error", new_callable=AsyncMock) as mock_log_error:
             with patch.object(provider, "_get", side_effect=Exception("Mock error")):
