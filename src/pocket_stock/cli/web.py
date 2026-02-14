@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+from datetime import date, datetime, timedelta
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -105,11 +106,17 @@ async def fetch_stock_quote(stock_code: str, timeout: float = 10.0) -> StockQuot
     return quote
 
 
-async def search_stock_news(stock_name: str) -> StockSearchResponse:
+async def search_stock_news(
+    stock_name: str,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> StockSearchResponse:
     """异步搜索指定股票的相关新闻。
 
     Args:
         stock_name: 股票名称
+        start_date: 搜索起始日期，如果为 None 则不限制起始时间
+        end_date: 搜索结束日期，如果为 None 则不限制结束时间
 
     Returns:
         搜索响应对象，包含各维度的搜索结果
@@ -118,7 +125,21 @@ async def search_stock_news(stock_name: str) -> StockSearchResponse:
         SearchError: 当搜索服务出现异常时抛出。
     """
     service = SearchService()
-    response = await service.search_stock(stock_name)
+
+    # 构建搜索配置（使用默认 topic）
+    search_config = None
+    if start_date or end_date:
+        from pocket_stock.search.models import SearchOptions
+
+        config_dict = {}
+        if start_date:
+            config_dict["start_date"] = start_date.isoformat()
+        if end_date:
+            config_dict["end_date"] = end_date.isoformat()
+
+        search_config = SearchOptions(**config_dict)
+
+    response = await service.search_stock(stock_name, search_config)
     return response
 
 
@@ -198,12 +219,18 @@ def render_stock_quote(quote: StockQuote) -> None:
             st.write(f"**更新时间**: {quote.timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
-def render_search_results(response: StockSearchResponse) -> None:
+def render_search_results(response: StockSearchResponse, date_start: date | None = None, date_end: date | None = None) -> None:
     """渲染搜索结果。
 
     Args:
         response: 搜索响应对象
+        date_start: 搜索起始日期，用于显示时间范围信息
+        date_end: 搜索结束日期，用于显示时间范围信息
     """
+    # 显示时间范围信息
+    if date_start and date_end:
+        st.info(f"📅 搜索时间范围: {date_start} 至 {date_end}")
+
     st.subheader("📰 相关新闻")
 
     dimension_names = {
@@ -372,6 +399,73 @@ def _format_turnover(turnover: float | None) -> str:
         return f"{turnover:.2f} 元"
 
 
+def _init_news_date_range() -> None:
+    """初始化新闻搜索时间范围的 session state。
+
+    设置默认起始时间为一周前，结束时间为今天。
+    如果 session state 中已存在这些键，则保持不变。
+    当检测到页面刷新时（通过检查 page_refreshed 标记），重置时间范围为默认值。
+    """
+    today = date.today()
+    week_ago = today - timedelta(days=7)
+
+    # 检测页面刷新：如果 page_refreshed 标记存在且为 True，则表示是刷新
+    if st.session_state.get("page_refreshed", False):
+        # 重置时间范围为默认值
+        st.session_state.news_date_start = week_ago
+        st.session_state.news_date_end = today
+        # 重置刷新标记
+        st.session_state.page_refreshed = False
+    else:
+        # 首次加载，初始化时间范围
+        if "news_date_start" not in st.session_state:
+            st.session_state.news_date_start = week_ago
+        if "news_date_end" not in st.session_state:
+            st.session_state.news_date_end = today
+
+    # 设置刷新标记为 True，下次运行时如果标记仍为 True，说明页面被刷新了
+    st.session_state.page_refreshed = True
+
+
+def _get_news_date_range() -> tuple[date, date]:
+    """获取当前选择的新闻搜索时间范围。
+
+    Returns:
+        元组 (起始日期, 结束日期)
+    """
+    return st.session_state.news_date_start, st.session_state.news_date_end
+
+
+def _set_news_date_range(start_date: date, end_date: date) -> None:
+    """设置新闻搜索时间范围。
+
+    Args:
+        start_date: 起始日期
+        end_date: 结束日期
+    """
+    st.session_state.news_date_start = start_date
+    st.session_state.news_date_end = end_date
+
+
+def _validate_date_range(start_date: date, end_date: date) -> tuple[bool, str | None]:
+    """验证时间范围的有效性。
+
+    Args:
+        start_date: 起始日期
+        end_date: 结束日期
+
+    Returns:
+        元组 (是否有效, 错误消息)
+    """
+    if start_date > end_date:
+        return False, "起始时间不能晚于结束时间"
+
+    if end_date > date.today():
+        return False, "结束时间不能晚于今天"
+
+    return True, None
+
+
 def render_settings_page() -> None:
     """渲染设置页面。
 
@@ -395,6 +489,9 @@ def render_home_page() -> None:
     if "error_message" not in st.session_state:
         st.session_state.error_message = None
 
+    # 初始化时间范围状态
+    _init_news_date_range()
+
     # 股票代码输入
     stock_code = st.text_input(
         "股票代码",
@@ -402,6 +499,27 @@ def render_home_page() -> None:
         help="请输入股票代码，如 sh600000（上海）或 sz000001（深圳）",
         key="stock_code_input",
     ).strip()
+
+    # 时间范围选择组件
+    st.divider()
+    st.markdown("### 📅 新闻搜索时间范围")
+
+    current_start, current_end = _get_news_date_range()
+
+    date_range = st.date_input(
+        "选择时间范围",
+        value=(current_start, current_end),
+        format="YYYY-MM-DD",
+        key="news_date_range_input",
+        help="选择搜索新闻的时间区间，系统将只搜索该时间段内的相关新闻",
+    )
+
+    # 更新时间范围到 session state
+    if isinstance(date_range, tuple) and len(date_range) == 2:
+        new_start, new_end = date_range
+        # 只有当值真正改变时才更新，避免不必要的重绘
+        if new_start != current_start or new_end != current_end:
+            _set_news_date_range(new_start, new_end)
 
     col1, col2, col3 = st.columns([1, 2, 1])
 
@@ -416,14 +534,24 @@ def render_home_page() -> None:
             st.error(error_msg)
             st.stop()
 
+        # 验证时间范围
+        date_start, date_end = _get_news_date_range()
+        is_date_valid, date_error_msg = _validate_date_range(date_start, date_end)
+        if not is_date_valid:
+            st.error(date_error_msg)
+            st.stop()
+
         # 显示加载状态
         with st.spinner("正在分析中，请稍候..."):
             try:
                 # 获取股票行情
                 quote = asyncio.run(fetch_stock_quote(stock_code))
 
-                # 搜索相关新闻
-                search_response = asyncio.run(search_stock_news(quote.name))
+                # 获取时间范围
+                date_start, date_end = _get_news_date_range()
+
+                # 搜索相关新闻（传入时间范围）
+                search_response = asyncio.run(search_stock_news(quote.name, date_start, date_end))
 
                 # LLM 分析
                 analysis_result = analyse_stock_with_llm(quote, search_response)
@@ -446,23 +574,26 @@ def render_home_page() -> None:
             st.session_state.error_message = None
             st.rerun()
 
-    # 显示分析结果
-    if st.session_state.analysis_complete and st.session_state.get("quote"):
-        quote = st.session_state.quote
-        search_response = st.session_state.search_response
-        analysis_result = st.session_state.analysis_result
+        # 显示分析结果
+        if st.session_state.analysis_complete and st.session_state.get("quote"):
+            quote = st.session_state.quote
+            search_response = st.session_state.search_response
+            analysis_result = st.session_state.analysis_result
 
-        # 使用 Tab 组织内容
-        tab1, tab2, tab3 = st.tabs(["📊 行情", "📰 新闻", "🤖 AI 分析"])
+            # 获取时间范围
+            date_start, date_end = _get_news_date_range()
 
-        with tab1:
-            render_stock_quote(quote)
+            # 使用 Tab 组织内容
+            tab1, tab2, tab3 = st.tabs(["📊 行情", "📰 新闻", "🤖 AI 分析"])
 
-        with tab2:
-            render_search_results(search_response)
+            with tab1:
+                render_stock_quote(quote)
 
-        with tab3:
-            render_analysis_result(analysis_result)
+            with tab2:
+                render_search_results(search_response, date_start, date_end)
+
+            with tab3:
+                render_analysis_result(analysis_result)
 
 
 def main() -> None:

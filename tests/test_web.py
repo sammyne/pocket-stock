@@ -18,6 +18,7 @@ from pocket_stock.cli.web import (
     search_stock_news,
     validate_stock_code,
 )
+from datetime import date, timedelta
 from pocket_stock.data_provider.exceptions import (
     DataParseError,
     DataValidationError,
@@ -690,3 +691,216 @@ class TestRenderAnalysisResult:
         mock_st.subheader.assert_called_once()
         mock_st.info.assert_called_once()
         mock_st.success.assert_called()
+
+
+class TestValidateDateRange:
+    """日期范围验证测试类。"""
+
+    def test_valid_date_range(self) -> None:
+        """测试有效的日期范围。"""
+        start_date = date(2024, 1, 1)
+        end_date = date(2024, 1, 7)
+
+        with patch("pocket_stock.cli.web.date") as mock_date:
+            mock_date.today.return_value = date(2024, 1, 10)
+
+            # 需要重新导入函数以使用 mock
+            from pocket_stock.cli.web import _validate_date_range
+
+            is_valid, error = _validate_date_range(start_date, end_date)
+            assert is_valid is True
+            assert error is None
+
+    def test_invalid_date_range_start_after_end(self) -> None:
+        """测试无效的日期范围（起始时间晚于结束时间）。"""
+        start_date = date(2024, 1, 10)
+        end_date = date(2024, 1, 1)
+
+        with patch("pocket_stock.cli.web.date") as mock_date:
+            mock_date.today.return_value = date(2024, 1, 15)
+
+            from pocket_stock.cli.web import _validate_date_range
+
+            is_valid, error = _validate_date_range(start_date, end_date)
+            assert is_valid is False
+            assert error == "起始时间不能晚于结束时间"
+
+    def test_invalid_date_range_end_after_today(self) -> None:
+        """测试无效的日期范围（结束时间晚于今天）。"""
+        start_date = date(2024, 1, 1)
+        end_date = date(2024, 12, 31)
+
+        with patch("pocket_stock.cli.web.date") as mock_date:
+            mock_date.today.return_value = date(2024, 1, 10)
+
+            from pocket_stock.cli.web import _validate_date_range
+
+            is_valid, error = _validate_date_range(start_date, end_date)
+            assert is_valid is False
+            assert error == "结束时间不能晚于今天"
+
+    def test_equal_dates(self) -> None:
+        """测试起始日期和结束日期相同的情况。"""
+        start_date = date(2024, 1, 1)
+        end_date = date(2024, 1, 1)
+
+        with patch("pocket_stock.cli.web.date") as mock_date:
+            mock_date.today.return_value = date(2024, 1, 5)
+
+            from pocket_stock.cli.web import _validate_date_range
+
+            is_valid, error = _validate_date_range(start_date, end_date)
+            assert is_valid is True
+            assert error is None
+
+    def test_date_range_today(self) -> None:
+        """测试结束日期为今天的情况。"""
+        start_date = date(2024, 1, 1)
+        end_date = date(2024, 1, 10)
+
+        with patch("pocket_stock.cli.web.date") as mock_date:
+            mock_date.today.return_value = date(2024, 1, 10)
+
+            from pocket_stock.cli.web import _validate_date_range
+
+            is_valid, error = _validate_date_range(start_date, end_date)
+            assert is_valid is True
+            assert error is None
+
+
+class TestGetNewsDateRange:
+    """获取新闻日期范围测试类。"""
+
+    @patch("pocket_stock.cli.web.st")
+    def test_get_date_range_from_session_state(self, mock_st) -> None:
+        """测试从 session state 获取日期范围。"""
+        start_date = date(2024, 1, 1)
+        end_date = date(2024, 1, 7)
+
+        mock_st.session_state.news_date_start = start_date
+        mock_st.session_state.news_date_end = end_date
+
+        from pocket_stock.cli.web import _get_news_date_range
+
+        result_start, result_end = _get_news_date_range()
+        assert result_start == start_date
+        assert result_end == end_date
+
+
+class TestSetNewsDateRange:
+    """设置新闻日期范围测试类。"""
+
+    @patch("pocket_stock.cli.web.st")
+    def test_set_date_range_to_session_state(self, mock_st) -> None:
+        """测试设置日期范围到 session state。"""
+        start_date = date(2024, 1, 1)
+        end_date = date(2024, 1, 7)
+
+        mock_st.session_state = {}
+
+        from pocket_stock.cli.web import _set_news_date_range
+
+        _set_news_date_range(start_date, end_date)
+        assert mock_st.session_state.news_date_start == start_date
+        assert mock_st.session_state.news_date_end == end_date
+
+
+class TestSearchStockNewsWithDateRange:
+    """带日期范围的新闻搜索测试类。"""
+
+    @pytest.mark.asyncio
+    async def test_search_news_with_date_range(self) -> None:
+        """测试带日期范围的成功搜索。"""
+        start_date = date(2024, 1, 1)
+        end_date = date(2024, 1, 7)
+
+        mock_response = MagicMock()
+        mock_response.total_results = 10
+        mock_response.dimension_count = 3
+        mock_response.total_time = 1.5
+        mock_response.dimensions = {}
+
+        mock_config = MagicMock()
+        mock_config.start_date = start_date.isoformat()
+        mock_config.end_date = end_date.isoformat()
+
+        with patch("pocket_stock.cli.web.SearchService") as mock_service_class:
+            with patch("pocket_stock.cli.web.SearchOptions") as mock_options_class:
+                mock_service = MagicMock()
+                mock_service.search_stock = AsyncMock(return_value=mock_response)
+                mock_service_class.return_value = mock_service
+                mock_options_class.return_value = mock_config
+
+                result = await search_stock_news("浦发银行", start_date, end_date)
+                assert result.total_results == 10
+                mock_service.search_stock.assert_called_once_with("浦发银行", mock_config)
+
+    @pytest.mark.asyncio
+    async def test_search_news_with_only_start_date(self) -> None:
+        """测试只有起始日期的新闻搜索。"""
+        start_date = date(2024, 1, 1)
+
+        mock_response = MagicMock()
+        mock_response.total_results = 10
+        mock_response.dimension_count = 3
+        mock_response.total_time = 1.5
+        mock_response.dimensions = {}
+
+        mock_config = MagicMock()
+        mock_config.start_date = start_date.isoformat()
+        mock_config.end_date = None
+
+        with patch("pocket_stock.cli.web.SearchService") as mock_service_class:
+            with patch("pocket_stock.cli.web.SearchOptions") as mock_options_class:
+                mock_service = MagicMock()
+                mock_service.search_stock = AsyncMock(return_value=mock_response)
+                mock_service_class.return_value = mock_service
+                mock_options_class.return_value = mock_config
+
+                result = await search_stock_news("浦发银行", start_date, None)
+                assert result.total_results == 10
+                mock_service.search_stock.assert_called_once_with("浦发银行", mock_config)
+
+    @pytest.mark.asyncio
+    async def test_search_news_with_only_end_date(self) -> None:
+        """测试只有结束日期的新闻搜索。"""
+        end_date = date(2024, 1, 7)
+
+        mock_response = MagicMock()
+        mock_response.total_results = 10
+        mock_response.dimension_count = 3
+        mock_response.total_time = 1.5
+        mock_response.dimensions = {}
+
+        mock_config = MagicMock()
+        mock_config.start_date = None
+        mock_config.end_date = end_date.isoformat()
+
+        with patch("pocket_stock.cli.web.SearchService") as mock_service_class:
+            with patch("pocket_stock.cli.web.SearchOptions") as mock_options_class:
+                mock_service = MagicMock()
+                mock_service.search_stock = AsyncMock(return_value=mock_response)
+                mock_service_class.return_value = mock_service
+                mock_options_class.return_value = mock_config
+
+                result = await search_stock_news("浦发银行", None, end_date)
+                assert result.total_results == 10
+                mock_service.search_stock.assert_called_once_with("浦发银行", mock_config)
+
+    @pytest.mark.asyncio
+    async def test_search_news_without_date_range(self) -> None:
+        """测试不带日期范围的新闻搜索。"""
+        mock_response = MagicMock()
+        mock_response.total_results = 10
+        mock_response.dimension_count = 3
+        mock_response.total_time = 1.5
+        mock_response.dimensions = {}
+
+        with patch("pocket_stock.cli.web.SearchService") as mock_service_class:
+            mock_service = MagicMock()
+            mock_service.search_stock = AsyncMock(return_value=mock_response)
+            mock_service_class.return_value = mock_service
+
+            result = await search_stock_news("浦发银行")
+            assert result.total_results == 10
+            mock_service.search_stock.assert_called_once_with("浦发银行", None)
