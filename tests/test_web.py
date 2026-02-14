@@ -438,9 +438,26 @@ class TestSearchStockNews:
             mock_service.search_stock = AsyncMock(return_value=mock_response)
             mock_service_class.return_value = mock_service
 
-            result = await search_stock_news("浦发银行")
-            assert result.total_results == 10
-            mock_service.search_stock.assert_called_once_with("浦发银行")
+            with patch("pocket_stock.cli.web.SearchConfigManager") as mock_config_manager_class:
+                mock_config_manager = MagicMock()
+                mock_user_config = MagicMock()
+                mock_user_config.max_results = 5
+                mock_user_config.search_depth = "basic"
+                mock_user_config.chunks_per_source = 3
+                mock_user_config.topic = "general"
+                mock_user_config.include_answer = False
+                mock_user_config.include_answer_level = None
+                mock_user_config.country = "china"
+                mock_config_manager.load.return_value = mock_user_config
+                mock_config_manager_class.return_value = mock_config_manager
+
+                result = await search_stock_news("浦发银行")
+                assert result.total_results == 10
+                # 验证 search_stock 被调用，现在会传递 SearchOptions 对象
+                assert mock_service.search_stock.called
+                call_args = mock_service.search_stock.call_args
+                assert call_args[0][0] == "浦发银行"
+                assert call_args[0][1] is not None  # SearchOptions 对象
 
     @pytest.mark.asyncio
     async def test_search_network_error(self) -> None:
@@ -796,7 +813,8 @@ class TestSetNewsDateRange:
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 7)
 
-        mock_st.session_state = {}
+        # 使用 MagicMock 而不是空字典，这样可以设置属性
+        mock_st.session_state = MagicMock()
 
         from pocket_stock.cli.web import _set_news_date_range
 
@@ -811,6 +829,8 @@ class TestSearchStockNewsWithDateRange:
     @pytest.mark.asyncio
     async def test_search_news_with_date_range(self) -> None:
         """测试带日期范围的成功搜索。"""
+        from pocket_stock.search.models import SearchOptions, SearchDepth, SearchTopic
+
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 7)
 
@@ -820,24 +840,38 @@ class TestSearchStockNewsWithDateRange:
         mock_response.total_time = 1.5
         mock_response.dimensions = {}
 
-        mock_config = MagicMock()
-        mock_config.start_date = start_date.isoformat()
-        mock_config.end_date = end_date.isoformat()
-
         with patch("pocket_stock.cli.web.SearchService") as mock_service_class:
-            with patch("pocket_stock.cli.web.SearchOptions") as mock_options_class:
+            with patch("pocket_stock.cli.web.SearchConfigManager") as mock_config_manager_class:
                 mock_service = MagicMock()
                 mock_service.search_stock = AsyncMock(return_value=mock_response)
                 mock_service_class.return_value = mock_service
-                mock_options_class.return_value = mock_config
+
+                mock_config_manager = MagicMock()
+                mock_user_config = MagicMock()
+                mock_user_config.max_results = 5
+                mock_user_config.search_depth = "basic"
+                mock_user_config.chunks_per_source = 3
+                mock_user_config.topic = "general"
+                mock_user_config.include_answer = False
+                mock_user_config.include_answer_level = None
+                mock_user_config.country = "china"
+                mock_config_manager.load.return_value = mock_user_config
+                mock_config_manager_class.return_value = mock_config_manager
 
                 result = await search_stock_news("浦发银行", start_date, end_date)
                 assert result.total_results == 10
-                mock_service.search_stock.assert_called_once_with("浦发银行", mock_config)
+                assert mock_service.search_stock.called
+                call_args = mock_service.search_stock.call_args
+                assert call_args[0][0] == "浦发银行"
+                assert isinstance(call_args[0][1], SearchOptions)
+                assert call_args[0][1].start_date == start_date.isoformat()
+                assert call_args[0][1].end_date == end_date.isoformat()
 
     @pytest.mark.asyncio
     async def test_search_news_with_only_start_date(self) -> None:
         """测试只有起始日期的新闻搜索。"""
+        from pocket_stock.search.models import SearchOptions
+
         start_date = date(2024, 1, 1)
 
         mock_response = MagicMock()
@@ -846,24 +880,38 @@ class TestSearchStockNewsWithDateRange:
         mock_response.total_time = 1.5
         mock_response.dimensions = {}
 
-        mock_config = MagicMock()
-        mock_config.start_date = start_date.isoformat()
-        mock_config.end_date = None
-
         with patch("pocket_stock.cli.web.SearchService") as mock_service_class:
-            with patch("pocket_stock.cli.web.SearchOptions") as mock_options_class:
+            with patch("pocket_stock.cli.web.SearchConfigManager") as mock_config_manager_class:
                 mock_service = MagicMock()
                 mock_service.search_stock = AsyncMock(return_value=mock_response)
                 mock_service_class.return_value = mock_service
-                mock_options_class.return_value = mock_config
+
+                mock_config_manager = MagicMock()
+                mock_user_config = MagicMock()
+                mock_user_config.max_results = 5
+                mock_user_config.search_depth = "basic"
+                mock_user_config.chunks_per_source = 3
+                mock_user_config.topic = "general"
+                mock_user_config.include_answer = False
+                mock_user_config.include_answer_level = None
+                mock_user_config.country = "china"
+                mock_config_manager.load.return_value = mock_user_config
+                mock_config_manager_class.return_value = mock_config_manager
 
                 result = await search_stock_news("浦发银行", start_date, None)
                 assert result.total_results == 10
-                mock_service.search_stock.assert_called_once_with("浦发银行", mock_config)
+                assert mock_service.search_stock.called
+                call_args = mock_service.search_stock.call_args
+                assert call_args[0][0] == "浦发银行"
+                assert isinstance(call_args[0][1], SearchOptions)
+                assert call_args[0][1].start_date == start_date.isoformat()
+                assert call_args[0][1].end_date is None
 
     @pytest.mark.asyncio
     async def test_search_news_with_only_end_date(self) -> None:
         """测试只有结束日期的新闻搜索。"""
+        from pocket_stock.search.models import SearchOptions
+
         end_date = date(2024, 1, 7)
 
         mock_response = MagicMock()
@@ -872,24 +920,38 @@ class TestSearchStockNewsWithDateRange:
         mock_response.total_time = 1.5
         mock_response.dimensions = {}
 
-        mock_config = MagicMock()
-        mock_config.start_date = None
-        mock_config.end_date = end_date.isoformat()
-
         with patch("pocket_stock.cli.web.SearchService") as mock_service_class:
-            with patch("pocket_stock.cli.web.SearchOptions") as mock_options_class:
+            with patch("pocket_stock.cli.web.SearchConfigManager") as mock_config_manager_class:
                 mock_service = MagicMock()
                 mock_service.search_stock = AsyncMock(return_value=mock_response)
                 mock_service_class.return_value = mock_service
-                mock_options_class.return_value = mock_config
+
+                mock_config_manager = MagicMock()
+                mock_user_config = MagicMock()
+                mock_user_config.max_results = 5
+                mock_user_config.search_depth = "basic"
+                mock_user_config.chunks_per_source = 3
+                mock_user_config.topic = "general"
+                mock_user_config.include_answer = False
+                mock_user_config.include_answer_level = None
+                mock_user_config.country = "china"
+                mock_config_manager.load.return_value = mock_user_config
+                mock_config_manager_class.return_value = mock_config_manager
 
                 result = await search_stock_news("浦发银行", None, end_date)
                 assert result.total_results == 10
-                mock_service.search_stock.assert_called_once_with("浦发银行", mock_config)
+                assert mock_service.search_stock.called
+                call_args = mock_service.search_stock.call_args
+                assert call_args[0][0] == "浦发银行"
+                assert isinstance(call_args[0][1], SearchOptions)
+                assert call_args[0][1].start_date is None
+                assert call_args[0][1].end_date == end_date.isoformat()
 
     @pytest.mark.asyncio
     async def test_search_news_without_date_range(self) -> None:
         """测试不带日期范围的新闻搜索。"""
+        from pocket_stock.search.models import SearchOptions
+
         mock_response = MagicMock()
         mock_response.total_results = 10
         mock_response.dimension_count = 3
@@ -897,10 +959,29 @@ class TestSearchStockNewsWithDateRange:
         mock_response.dimensions = {}
 
         with patch("pocket_stock.cli.web.SearchService") as mock_service_class:
-            mock_service = MagicMock()
-            mock_service.search_stock = AsyncMock(return_value=mock_response)
-            mock_service_class.return_value = mock_service
+            with patch("pocket_stock.cli.web.SearchConfigManager") as mock_config_manager_class:
+                mock_service = MagicMock()
+                mock_service.search_stock = AsyncMock(return_value=mock_response)
+                mock_service_class.return_value = mock_service
 
-            result = await search_stock_news("浦发银行")
-            assert result.total_results == 10
-            mock_service.search_stock.assert_called_once_with("浦发银行", None)
+                mock_config_manager = MagicMock()
+                mock_user_config = MagicMock()
+                mock_user_config.max_results = 5
+                mock_user_config.search_depth = "basic"
+                mock_user_config.chunks_per_source = 3
+                mock_user_config.topic = "general"
+                mock_user_config.include_answer = False
+                mock_user_config.include_answer_level = None
+                mock_user_config.country = "china"
+                mock_config_manager.load.return_value = mock_user_config
+                mock_config_manager_class.return_value = mock_config_manager
+
+                result = await search_stock_news("浦发银行")
+                assert result.total_results == 10
+                assert mock_service.search_stock.called
+                call_args = mock_service.search_stock.call_args
+                assert call_args[0][0] == "浦发银行"
+                # 即使没有日期范围，也会传递 SearchOptions 对象（而不是 None）
+                assert isinstance(call_args[0][1], SearchOptions)
+                assert call_args[0][1].start_date is None
+                assert call_args[0][1].end_date is None
